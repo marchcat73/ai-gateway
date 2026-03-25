@@ -4,3 +4,30 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+anyhow = "1.0"
+# Core async
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+
+# HTTP & Parsing
+reqwest = { version = "0.11", features = ["json", "rustls-tls", "gzip"], default-features = false }
+readabilityrs = "0.1"
+scraper = "0.18" # Для дополнительной очистки или работы с селекторами
+html5ever = "0.26"
+
+# Data & Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+html2text = "0.6"
+
+# Errors & Utils
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2"
+
+# Storage (опционально)
+sqlx = { version = "0.8.6", features = ["runtime-tokio-rustls", "postgres", "sqlite"] }
+qdrant-client = "1.5"
