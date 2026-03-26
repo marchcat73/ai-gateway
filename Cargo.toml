@@ -1,10 +1,9 @@
 [package]
 name = "ai-gateway"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
-anyhow = "1.0"
 # Core async
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
@@ -12,8 +11,8 @@ async-trait = "0.1"
 # HTTP & Parsing
 reqwest = { version = "0.11", features = ["json", "rustls-tls", "gzip"], default-features = false }
 readabilityrs = "0.1"
-scraper = "0.18" # Для дополнительной очистки или работы с селекторами
-html5ever = "0.26"
+scraper = "0.26"
+html5ever = "0.39"
 
 # Data & Serialization
 serde = { version = "1", features = ["derive"] }
@@ -27,7 +26,26 @@ thiserror = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2"
+anyhow = "1.0"
+dotenvy = "0.15"
+
+# Embeddings
+model2vec = "0.2"  # Model2Vec для быстрых эмбеддингов
+ndarray = "0.15"   # Для работы с векторами
 
 # Storage (опционально)
-sqlx = { version = "0.8.6", features = ["runtime-tokio-rustls", "postgres", "sqlite"] }
+sqlx = { version = "0.8.6", features = [
+    "runtime-tokio-rustls",
+    "postgres",
+    "uuid",
+    "chrono",
+    "json",
+    "macros"
+], default-features = false }
 qdrant-client = "1.5"
+
+# Hashing
+sha2 = "0.10"
+
+# Vector math (для косинусного сходства если нужно вручную)
+ndarray-linalg = { version = "0.16", features = ["openblas-system"] }

@@ -1,0 +1,20 @@
+version: "3.8"
+services:
+  postgres:
+    image: pgvector/pgvector:pg16 # Официальный образ с pgvector
+    environment:
+      POSTGRES_USER: ai_gateway
+      POSTGRES_PASSWORD: dev_password
+      POSTGRES_DB: ai_gateway
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_gateway"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pg_data:

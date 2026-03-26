@@ -1,5 +1,5 @@
 {
-  "id": "062e7206-4b6b-480b-b6e5-34ebc7202927",
+  "id": "be6886c3-aaf5-4795-bacf-bffcbdedf9b1",
   "source_url": "https://habr.com/ru/articles/752346/",
   "final_url": "https://habr.com/ru/articles/752346/",
   "title": "Простой способ проверять typescript без skipLibCheck: true",
@@ -11,7 +11,7 @@
   "image": "https://habr.com/share/publication/752346/54b896bda3b02888370a28c53904acd7/",
   "language": null,
   "word_count": 374,
-  "crawled_at": "2026-03-26T15:03:02.838234472Z",
+  "crawled_at": "2026-03-26T15:17:46.688684718Z",
   "meta": {
     "content_len": 4853,
     "excerpt_len": 300

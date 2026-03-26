@@ -1,32 +1,42 @@
-use ai_gateway::crawler::Crawler;
+use ai_gateway::{crawler::Crawler, storage::PostgresStorage, storage::ContentStorage};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Инициализация логирования
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        .with_env_filter("ai_gateway=debug,info")
+        .init();
+
+    dotenvy::dotenv().ok();
+    let database_url = std::env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set");
+    let storage = PostgresStorage::connect(
+        &database_url
+    ).await?;
 
     let crawler = Crawler::new();
 
-    // Тестовая статья (например, с Хабра или блога)
-    let test_url = "https://habr.com/ru/articles/752346/";
+    // 2. Краулим и сохраняем
+    let url = "https://habr.com/ru/articles/752346/";
+    tracing::info!("🕷️  Crawling: {}", url);
 
-    println!("🕷️  Crawling: {}", test_url);
-
-    match crawler.crawl(test_url).await {
+    match crawler.crawl(url).await {
         Ok(content) => {
-            // Сохраняем в файл для проверки
-            let json = serde_json::to_string_pretty(&content)?;
-            std::fs::write("extracted_content.json", json)?;
-            println!("\n💾 Saved to extracted_content.json");
+            tracing::info!("✅ Extracted: {} ({} words)", content.title, content.word_count);
 
-            println!("\n✅ Success!");
-            println!("📰 Title: {}", content.title);
-            println!("📝 Excerpt: {}", content.excerpt.unwrap_or_default());
-            println!("🔤 Words: {}", content.word_count);
-            println!("🔗 URL: {}", content.final_url);
+            // 3. Сохраняем в БД (включая чанкинг и эмбеддинги)
+            storage.save(content).await?;
+            tracing::info!("💾 Saved to PostgreSQL with chunks");
 
+            // 4. Тест семантического поиска
+            let query = "о чем эта статья?";
+            let results = storage.search_semantic(query, 3).await?;
+            tracing::info!("🔍 Search results for '{}':", query);
+            for (i, chunk) in results.iter().enumerate() {
+                tracing::info!("  {}. [{}] {}", i+1, chunk.word_count,
+                    chunk.content.chars().take(100).collect::<String>());
+            }
         }
-        Err(e) => eprintln!("\n❌ Error: {}", e),
+        Err(e) => tracing::error!("❌ Crawl failed: {}", e),
     }
 
     Ok(())
