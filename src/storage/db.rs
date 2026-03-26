@@ -1,6 +1,7 @@
 // src/storage/db.rs
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{PgPool, FromRow, Row};
+use pgvector::Vector;  // ← Импортируем Vector
 use async_trait::async_trait;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
@@ -34,6 +35,7 @@ pub struct DocumentRow {
     pub word_count: i32,
     pub crawled_at: DateTime<Utc>,
     pub meta: serde_json::Value,
+    pub embedding: Option<Vector>,  // ← Vector для pgvector
 }
 
 #[derive(Debug, FromRow)]
@@ -48,10 +50,10 @@ pub struct ChunkRow {
     pub start_char: i32,
     pub end_char: i32,
     pub meta: serde_json::Value,
+    // embedding не нужен при выборке чанков (только для поиска)
 }
 
 impl PostgresStorage {
-    /// Подключение к базе данных
     pub async fn connect(database_url: &str) -> Result<Self> {
         info!("🗄️  Connecting to PostgreSQL...");
 
@@ -63,7 +65,6 @@ impl PostgresStorage {
             .await
             .map_err(|e| StorageError::Database(e.to_string()))?;
 
-        // Проверка подключения
         sqlx::query("SELECT 1")
             .fetch_one(&pool)
             .await
@@ -71,10 +72,7 @@ impl PostgresStorage {
 
         info!("✓ Connected to PostgreSQL");
 
-        // Инициализация модели эмбеддингов
         let embedding_model = EmbeddingModel::new().await?;
-
-        // Опционально: подключаем кэш эмбеддингов
         let embedding_model = embedding_model.with_cache(pool.clone());
 
         Ok(Self {
@@ -85,19 +83,13 @@ impl PostgresStorage {
         })
     }
 
-    /// Применение миграций (в продакшене используйте sqlx::migrate!)
     pub async fn run_migrations(&self) -> Result<()> {
         info!("📜 Running database migrations...");
-
-        // В продакшене раскомментируйте:
-        // sqlx::migrate!("./migrations").run(&self.pool).await
-        //     .map_err(|e| StorageError::Database(e.to_string()))?;
-
+        // sqlx::migrate!("./migrations").run(&self.pool).await?;
         info!("✓ Migrations completed");
         Ok(())
     }
 
-    /// Проверка существования документа по URL
     pub async fn exists_by_url(&self, url: &str) -> Result<bool> {
         let exists: (bool,) = sqlx::query_as(
             "SELECT EXISTS(SELECT 1 FROM documents WHERE source_url = $1)"
@@ -106,48 +98,31 @@ impl PostgresStorage {
         .fetch_one(&self.pool)
         .await
         .map_err(|e| StorageError::Database(e.to_string()))?;
-
         Ok(exists.0)
     }
 
-    /// Удаление документа и всех связанных чанков
     pub async fn delete(&self, id: Uuid) -> Result<()> {
         sqlx::query("DELETE FROM documents WHERE id = $1")
             .bind(id)
             .execute(&self.pool)
             .await
             .map_err(|e| StorageError::Database(e.to_string()))?;
-
         Ok(())
-    }
-
-    /// Поиск с фильтрами
-    pub async fn search_with_filters(
-        &self,
-        _query: &str,
-        _limit: usize,
-        _min_score: Option<f32>,
-        _language: Option<&str>,
-        _date_from: Option<DateTime<Utc>>,
-    ) -> Result<Vec<ContentChunk>> {
-        // Упрощённая реализация до правильной настройки БД
-        Ok(Vec::new())
     }
 }
 
 #[async_trait]
 impl ContentStorage for PostgresStorage {
-    /// Сохранение документа с чанками
     async fn save(&self, content: ExtractedContent) -> Result<()> {
         info!("💾 Saving document: {} ({})", content.title, content.source_url);
 
         let mut tx = self.pool.begin().await
             .map_err(|e| StorageError::Database(e.to_string()))?;
 
-        // 1. Генерируем эмбеддинг для всего документа
+        // Генерируем и конвертируем эмбеддинг
         let doc_embedding = self.embedding_model.embed(&content.content_text).await?;
+        let doc_embedding_vec = Vector::from(doc_embedding);  // ← Конвертация
 
-        // 2. Сохраняем документ
         sqlx::query(
             r#"
             INSERT INTO documents (
@@ -179,25 +154,25 @@ impl ContentStorage for PostgresStorage {
         .bind(content.word_count as i32)
         .bind(content.crawled_at)
         .bind(serde_json::to_value(&content.meta).unwrap_or_default())
-        .bind(doc_embedding)
+        .bind(doc_embedding_vec)  // ← Передаём Vector
         .execute(&mut *tx)
         .await
         .map_err(|e| StorageError::Database(e.to_string()))?;
 
-        // 3. Чанкаем контент
+        // Сохраняем чанки
         let chunks = self.chunker.chunk(&content, &self.chunk_config);
         info!("📝 Generated {} chunks", chunks.len());
 
-        // 4. Сохраняем чанки с эмбеддингами
         for chunk in chunks {
             let chunk_embedding = self.embedding_model.embed(&chunk.content).await?;
+            let chunk_embedding_vec = Vector::from(chunk_embedding);  // ← Конвертация
 
             sqlx::query(
                 r#"
                 INSERT INTO chunks (
                     id, document_id, chunk_index, title, content,
                     content_html, word_count, start_char, end_char,
-                    metadata, embedding
+                    meta, embedding
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                 "#
             )
@@ -211,7 +186,7 @@ impl ContentStorage for PostgresStorage {
             .bind(chunk.start_char as i32)
             .bind(chunk.end_char as i32)
             .bind(serde_json::to_value(&chunk.meta).unwrap_or_default())
-            .bind(chunk_embedding)
+            .bind(chunk_embedding_vec)  // ← Передаём Vector
             .execute(&mut *tx)
             .await
             .map_err(|e| StorageError::Database(e.to_string()))?;
@@ -224,14 +199,13 @@ impl ContentStorage for PostgresStorage {
         Ok(())
     }
 
-    /// Получение документа по URL
     async fn get_by_url(&self, url: &str) -> Result<Option<ExtractedContent>> {
         let row = sqlx::query_as::<_, DocumentRow>(
             r#"
             SELECT
                 id, source_url, final_url, title, content_html, content_text,
                 author, published_date, excerpt, image, language,
-                word_count, crawled_at, meta
+                word_count, crawled_at, meta, embedding
             FROM documents WHERE source_url = $1
             "#
         )
@@ -258,11 +232,11 @@ impl ContentStorage for PostgresStorage {
         }))
     }
 
-    /// Семантический поиск по чанкам
     async fn search_semantic(&self, query: &str, limit: usize) -> Result<Vec<ContentChunk>> {
         info!("🔍 Semantic search: '{}' (limit={})", query, limit);
 
         let query_embedding = self.embedding_model.embed(query).await?;
+        let query_vector = Vector::from(query_embedding);  // ← Конвертация
 
         let rows = sqlx::query_as::<_, ChunkRow>(
             r#"
@@ -271,26 +245,24 @@ impl ContentStorage for PostgresStorage {
                 content_html, word_count, start_char, end_char,
                 meta
             FROM chunks
-            ORDER BY embedding <=> $1
+            ORDER BY embedding <-> $1  -- pgvector оператор косинусного расстояния
             LIMIT $2
             "#
         )
-        .bind(query_embedding)
+        .bind(query_vector)  // ← Передаём Vector
         .bind(limit as i64)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| StorageError::Database(e.to_string()))?;
 
-        // Получаем URL документов для чанков
+        // Получаем URL документов
         let doc_ids: Vec<Uuid> = rows.iter().map(|r| r.document_id).collect();
-
         let doc_urls = if !doc_ids.is_empty() {
             let docs = sqlx::query("SELECT id, source_url FROM documents WHERE id = ANY($1)")
                 .bind(&doc_ids)
                 .fetch_all(&self.pool)
                 .await
                 .map_err(|e| StorageError::Database(e.to_string()))?;
-
             docs.into_iter()
                 .filter_map(|r| {
                     let id = r.try_get::<Uuid, _>("id").ok()?;

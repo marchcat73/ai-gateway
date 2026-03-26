@@ -1,11 +1,12 @@
 // src/storage/embeddings.rs
+use pgvector::Vector;  // ← Импортируем Vector
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use tracing::{info, warn};
 
 use super::{StorageError, Result};
 
-/// Обёртка над эмбедингами для генерации векторов
+/// Обёртка над эмбеддингами для генерации векторов
 pub struct EmbeddingModel {
     cache_pool: Option<PgPool>,
     dimension: usize,
@@ -16,6 +17,7 @@ impl EmbeddingModel {
     pub async fn new() -> Result<Self> {
         info!("🧠 Loading embedding model...");
 
+        // Должно совпадать с vector(N) в миграции
         let dimension = 512;
         info!("✓ Model loaded: dimension={}", dimension);
 
@@ -31,7 +33,7 @@ impl EmbeddingModel {
         self
     }
 
-    /// Генерация эмбеддинга для текста (упрощённая реализация)
+    /// Генерация эмбеддинга для текста
     pub async fn embed(&self, text: &str) -> Result<Vec<f32>> {
         // 1. Проверяем кэш (если подключен)
         if let Some(pool) = &self.cache_pool {
@@ -40,7 +42,7 @@ impl EmbeddingModel {
             }
         }
 
-        // 2. Генерируем эмбеддинг (упрощённое хеширование для демонстрации)
+        // 2. Генерируем эмбеддинг (демо-реализация)
         let embedding_vec = self.generate_embedding(text);
 
         // 3. Сохраняем в кэш (если подключен)
@@ -53,14 +55,12 @@ impl EmbeddingModel {
         Ok(embedding_vec)
     }
 
-    /// Генерация эмбедингов для батча текстов (оптимизация)
+    /// Генерация эмбеддингов для батча текстов
     pub async fn embed_batch(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
         let mut embeddings = Vec::with_capacity(texts.len());
-
         for text in texts {
             embeddings.push(self.embed(text).await?);
         }
-
         Ok(embeddings)
     }
 
@@ -68,7 +68,8 @@ impl EmbeddingModel {
     async fn get_from_cache(&self, pool: &PgPool, text: &str) -> Result<Option<Vec<f32>>> {
         let text_hash = self.hash_text(text);
 
-        let record: Option<Vec<f32>> = sqlx::query_scalar(
+        // ← Читаем как Vector, затем конвертируем в Vec<f32>
+        let record: Option<Vector> = sqlx::query_scalar(
             r#"SELECT embedding FROM embedding_cache WHERE text_hash = $1"#
         )
         .bind(text_hash)
@@ -76,12 +77,15 @@ impl EmbeddingModel {
         .await
         .map_err(|e| StorageError::Database(e.to_string()))?;
 
-        Ok(record)
+        Ok(record.map(|v| v.to_vec()))  // ← Vector → Vec<f32>
     }
 
     /// Сохранение в кэш
     async fn save_to_cache(&self, pool: &PgPool, text: &str, embedding: &[f32]) -> Result<()> {
         let text_hash = self.hash_text(text);
+
+        // ← Конвертируем Vec<f32> → Vector перед сохранением
+        let embedding_vector = Vector::from(embedding.to_vec());
 
         sqlx::query(
             r#"
@@ -91,7 +95,7 @@ impl EmbeddingModel {
             "#
         )
         .bind(text_hash)
-        .bind(embedding)
+        .bind(embedding_vector)  // ← Передаём Vector
         .bind("model-v1")
         .execute(pool)
         .await
@@ -107,7 +111,7 @@ impl EmbeddingModel {
         format!("{:x}", hasher.finalize())
     }
 
-    /// Упрощённая генерация эмбеддинга путём детерминированного хеширования
+    /// Упрощённая генерация эмбеддинга (демо)
     fn generate_embedding(&self, text: &str) -> Vec<f32> {
         let mut hasher = Sha256::new();
         hasher.update(text.as_bytes());
@@ -118,14 +122,13 @@ impl EmbeddingModel {
             embedding[i % self.dimension] = (*byte as f32) / 128.0 - 1.0;
         }
 
-        // Нормализуем
+        // Нормализация
         let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
         if norm > 0.0 {
             for val in embedding.iter_mut() {
                 *val /= norm;
             }
         }
-
         embedding
     }
 
@@ -134,20 +137,17 @@ impl EmbeddingModel {
         self.dimension
     }
 
-    /// Косинусное сходство между двумя векторами
+    /// Косинусное сходство
     pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
         if a.len() != b.len() || a.is_empty() {
             return 0.0;
         }
-
         let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
         let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
         let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-
         if norm_a == 0.0 || norm_b == 0.0 {
             return 0.0;
         }
-
         dot / (norm_a * norm_b)
     }
 }

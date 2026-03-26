@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS chunks (
     word_count INTEGER NOT NULL DEFAULT 0,
     start_char INTEGER NOT NULL DEFAULT 0,
     end_char INTEGER NOT NULL DEFAULT 0,
-    metadata JSONB DEFAULT '{}'::jsonb,
+    meta JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     -- Векторное представление чанка (обязательно для семантического поиска)
