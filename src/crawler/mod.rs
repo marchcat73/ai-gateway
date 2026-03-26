@@ -11,6 +11,12 @@ pub struct Crawler {
     parser: Parser,
 }
 
+impl Default for Crawler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Crawler {
     pub fn new() -> Self {
         Self {
@@ -24,11 +30,11 @@ impl Crawler {
         let _ = url::Url::parse(url)
             .map_err(|e| types::CrawlerError::InvalidUrl(e.to_string()))?;
 
-        // 2. Fetch HTML
-        let html = self.fetcher.fetch(url).await?;
+        // 2. Fetch HTML + получаем финальный URL
+        let fetch_result = self.fetcher.fetch(url).await?;
 
-        // 3. Parse & Extract
-        let content = self.parser.parse(&html, url)?;
+        // 3. Parse & Extract (передаём final_url вместо исходного url)
+        let content = self.parser.parse(&fetch_result.html, &fetch_result.final_url)?;
 
         Ok(content)
     }

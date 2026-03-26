@@ -1,5 +1,4 @@
 use ai_gateway::crawler::Crawler;
-use tracing_subscriber;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

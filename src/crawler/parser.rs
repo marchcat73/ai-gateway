@@ -7,6 +7,12 @@ pub struct Parser {
     options: ReadabilityOptions,
 }
 
+impl Default for Parser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Parser {
     pub fn new() -> Self {
         let options = ReadabilityOptions::builder()
