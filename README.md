@@ -3,9 +3,22 @@
 ## Database
 
 ```bash
+# 1. Запуск БД
+docker-compose up -d
+
+# 2. Установка sqlx-cli для миграций
+cargo install sqlx-cli
+
+# 3. Применение миграций
+sqlx migrate run --database-url postgres://ai_gateway:dev_password@localhost:5432/ai_gateway
+
+# 4. Запуск приложения
+cargo run
+
+# если без docker
 sudo -u postgres psql
-CREATE USER aigateway WITH PASSWORD 'aigateway';
-CREATE DATABASE aigatewaydb OWNER aigateway;
+CREATE USER ai_gateway WITH PASSWORD 'dev_password';
+CREATE DATABASE ai_gateway OWNER ai_gateway;
 
 
 TRUNCATE documents, chunks RESTART IDENTITY CASCADE;
