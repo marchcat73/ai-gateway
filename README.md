@@ -13,6 +13,9 @@ cargo install sqlx-cli
 sqlx migrate run --database-url postgres://ai_gateway:dev_password@localhost:5432/ai_gateway
 
 # 4. Запуск приложения
+sudo docker ps -a
+# уесли контейнер не запущен
+sudo docker start ai-gateway-postgres-1
 cargo run
 
 # если без docker
