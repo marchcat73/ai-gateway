@@ -123,6 +123,8 @@ impl ContentStorage for PostgresStorage {
         let doc_embedding = self.embedding_model.embed(&content.content_text).await?;
         let doc_embedding_vec = Vector::from(doc_embedding);  // ← Конвертация
 
+        tracing::debug!("📄 Document ID: {}, URL: {}", content.id, content.source_url);
+
         sqlx::query(
             r#"
             INSERT INTO documents (
@@ -160,8 +162,18 @@ impl ContentStorage for PostgresStorage {
         .map_err(|e| StorageError::Database(e.to_string()))?;
 
         // Сохраняем чанки
-        let chunks = self.chunker.chunk(&content, &self.chunk_config);
+        let mut chunks = self.chunker.chunk(&content, &self.chunk_config);
         info!("📝 Generated {} chunks", chunks.len());
+
+        // 🔑 ВАЖНО: Гарантируем, что source_id у чанков совпадает с id документа
+        for chunk in &mut chunks {
+            chunk.source_id = content.id;  // ← Синхронизация!
+            chunk.source_url = content.final_url.clone();  // ← Также обновляем URL
+        }
+
+        for chunk in &chunks {
+            tracing::debug!("🔗 Chunk {} -> document_id: {}", chunk.id, chunk.source_id);
+        }
 
         for chunk in chunks {
             let chunk_embedding = self.embedding_model.embed(&chunk.content).await?;

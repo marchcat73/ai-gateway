@@ -6,6 +6,9 @@
 sudo -u postgres psql
 CREATE USER aigateway WITH PASSWORD 'aigateway';
 CREATE DATABASE aigatewaydb OWNER aigateway;
+
+
+TRUNCATE documents, chunks RESTART IDENTITY CASCADE;
 ```
 
 ## Errors
