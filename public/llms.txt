@@ -1,7 +1,7 @@
 # AI Gateway Demo
 
 > AI-Optimized Content Index
-> Generated: 2026-03-28 15:36 UTC
+> Generated: 2026-03-28 17:38 UTC
 > Language: en
 
 ## About
@@ -38,4 +38,4 @@ _2 content chunks available (use anchors for precise access)_
 - **Index Format**: llms.txt v1.0
 - **Generator**: AI Gateway
 
-> For questions or API access, contact: [support@ai-gateway.example.com](mailto:support@ai-gateway.example.com)
+> For questions or API access, contact: [support@marchcat.com](mailto:support@marchcat.com)

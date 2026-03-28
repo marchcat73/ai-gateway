@@ -17,7 +17,7 @@ async fn main() -> anyhow::Result<()> {
     // 2. Опционально: Краулинг sitemap
     let do_crawl = std::env::var("CRAWL_SITEMAP").unwrap_or_default() == "true";
     if do_crawl {
-        let sitemap_url = "https://habr.com/sitemap.xml"; // Пример
+        let sitemap_url = "https://marchcat.com/sitemap.xml"; // Пример
         let config = LlmsConfig::default();
         let crawler = SitemapCrawler::new(config);
 
@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
 
     // 4. Генерация llms.txt
     let llms_config = LlmsConfig {
-        site_url: "https://ai-gateway.example.com".to_string(),
+        site_url: "https://marchcat.com".to_string(),
         site_name: "AI Gateway Demo".to_string(),
         site_description: Some("Structured content index for AI agents".to_string()),
         include_chunk_content: false,

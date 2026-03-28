@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS documents (
     meta JSONB DEFAULT '{}'::jsonb,
 
     -- Вектор всего документа (опционально, для быстрого поиска по документу)
-    embedding vector(512)
+    embedding vector(256)
 );
 
 -- Индексы для документов
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS chunks (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     -- Векторное представление чанка (обязательно для семантического поиска)
-    embedding vector(512) NOT NULL
+    embedding vector(256) NOT NULL
 );
 
 -- Индексы для чанков
@@ -58,7 +58,7 @@ CREATE INDEX IF NOT EXISTS idx_chunks_index ON chunks(document_id, chunk_index);
 -- Таблица для кэша эмбеддингов (чтобы не генерировать дважды одинаковый текст)
 CREATE TABLE IF NOT EXISTS embedding_cache (
     text_hash TEXT PRIMARY KEY, -- MD5 или SHA256 от текста
-    embedding vector(512) NOT NULL,
+    embedding vector(256) NOT NULL,
     model_version TEXT NOT NULL DEFAULT 'model2vec-base-v1',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

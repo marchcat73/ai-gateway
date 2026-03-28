@@ -36,7 +36,7 @@ impl EmbeddingModel {
 
         let dimension = model.as_ref()
             .map(|m| m.embedding_dim())
-            .unwrap_or(512); // Fallback dimension
+            .unwrap_or(256); // Fallback dimension
 
         Ok(Self {
             model,
