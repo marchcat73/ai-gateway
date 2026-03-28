@@ -44,3 +44,30 @@ cargo test chunking::sentence
 # Запуск с логами
 RUST_LOG=ai_gateway=debug cargo run
 ```
+
+# 1. Установите huggingface-hub (если нет)
+
+pip install huggingface-hub
+
+# 2. Скачайте модель в локальную папку
+
+```sh
+cd models
+git clone https://huggingface.co/minishlab/potion-multilingual-128M
+```
+
+# 3. Проверьте структуру папки:
+
+```sh
+ls -la ./models/potion-multilingual-128M/
+```
+
+# Должны быть файлы:
+
+# - config.json
+
+# - model.safetensors
+
+# - tokenizer.json (или tokenizer_config.json)
+
+# - special_tokens_map.json

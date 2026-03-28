@@ -4,7 +4,7 @@ use serde::Deserialize;
 use crate::llms_txt::LlmsConfig;
 use crate::crawler::Crawler;
 use crate::storage::ContentStorage;
-use tracing::{info, warn, error};
+use tracing::{debug, error, info, warn};
 use std::future::Future;
 use std::pin::Pin;
 
@@ -94,6 +94,8 @@ impl SitemapCrawler {
         &'a self,
         sitemap_url: &'a str,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<SitemapUrl>, SitemapError>> + Send + 'a>> {
+
+
         Box::pin(async move {
             info!("📥 Fetching: {}", sitemap_url);
 
@@ -108,30 +110,44 @@ impl SitemapCrawler {
             let xml = response.text().await
                 .map_err(|e| SitemapError::Fetch(e.to_string()))?;
 
+            debug!("🔍 Fetched {} bytes from {}", xml.len(), sitemap_url);
+            if xml.contains("<sitemapindex") {
+                debug!("📑 Detected sitemapindex structure");
+            } else if xml.contains("<urlset") {
+                debug!("📄 Detected urlset structure");
+            }
+
             // Пробуем распарсить как SitemapIndex
             if let Ok(index) = from_str::<SitemapIndex>(&xml) {
-                info!("📑 Found sitemap index with {} references", index.sitemaps.len());
+                if !index.sitemaps.is_empty() {
+                    info!("📑 Found sitemap index with {} references", index.sitemaps.len());
 
-                let mut all_urls = Vec::new();
-                for sitemap_ref in index.sitemaps {
-                    // ← Рекурсивный вызов теперь работает через Box::pin
-                    match self.load(&sitemap_ref.loc).await {
-                        Ok(urls) => {
-                            info!("✓ Loaded {} URLs from {}", urls.len(), sitemap_ref.loc);
-                            all_urls.extend(urls);
+                    let mut all_urls = Vec::new();
+                    for sitemap_ref in index.sitemaps {
+                        match self.load(&sitemap_ref.loc).await {
+                            Ok(urls) => {
+                                info!("✓ Loaded {} URLs from {}", urls.len(), sitemap_ref.loc);
+                                all_urls.extend(urls);
+                            }
+                            Err(e) => warn!("Failed to load nested sitemap {}: {}", sitemap_ref.loc, e),
                         }
-                        Err(e) => warn!("Failed to load nested sitemap {}: {}", sitemap_ref.loc, e),
                     }
+                    return Ok(all_urls);
                 }
-                return Ok(all_urls);
             }
 
             // Парсим как обычный Sitemap
-            let sitemap: Sitemap = from_str(&xml)
-                .map_err(|e| SitemapError::Parse(e.to_string()))?;
-
-            info!("✓ Parsed {} URLs from sitemap", sitemap.urls.len());
-            Ok(sitemap.urls)
+            match from_str::<Sitemap>(&xml) {
+                Ok(sitemap) => {
+                    info!("✓ Parsed {} URLs from sitemap", sitemap.urls.len());
+                    Ok(sitemap.urls)
+                }
+                Err(e) => {
+                    warn!("Failed to parse {} as Sitemap: {}", sitemap_url, e);
+                    // Возвращаем пустой список вместо ошибки, чтобы не ломать весь процесс
+                    Ok(Vec::new())
+                }
+            }
         })
     }
 

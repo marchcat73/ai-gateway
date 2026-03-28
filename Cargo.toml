@@ -32,8 +32,10 @@ dotenvy = "0.15"
 regex = "1"
 
 # Embeddings
-model2vec = "0.2"  # Model2Vec для быстрых эмбеддингов
-ndarray = "0.15"   # Для работы с векторами
+model2vec = "0.3"
+candle-core = "0.9.2"
+candle-transformers = "0.9.2"
+ndarray = "0.17.2"
 
 # Сегментация текста по стандартам Unicode
 unicode-segmentation = "1.10"

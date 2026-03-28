@@ -1,27 +1,45 @@
 // src/storage/embeddings.rs
-use pgvector::Vector;  // ← Импортируем Vector
+use pgvector::Vector;  // ← Для работы с pgvector
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use tracing::{info, warn};
+use std::sync::Arc;
 
 use super::{StorageError, Result};
 
-/// Обёртка над эмбеддингами для генерации векторов
+/// Обёртка над model2vec для генерации эмбеддингов
 pub struct EmbeddingModel {
+    // ← Реальная модель вместо заглушки
+    model: Option<Arc<model2vec::Model2Vec>>,
     cache_pool: Option<PgPool>,
     dimension: usize,
 }
 
 impl EmbeddingModel {
-    /// Инициализация модели
+    /// Инициализация модели (загружает model2vec)
     pub async fn new() -> Result<Self> {
-        info!("🧠 Loading embedding model...");
+        info!("🧠 Loading model2vec embedding model...");
 
-        // Должно совпадать с vector(N) в миграции
-        let dimension = 512;
-        info!("✓ Model loaded: dimension={}", dimension);
+        // Попытка загрузить модель (может занять время при первом запуске)
+        let model_path = std::env::var("MODEL2VEC_PATH").unwrap_or_else(|_| "model2vec".to_string());
+        let model = match model2vec::Model2Vec::from_pretrained(&model_path, None, None) {
+            Ok(m) => {
+                let dim = m.embedding_dim();
+                info!("✓ Model loaded from {}: dimension={}", model_path, dim);
+                Some(Arc::new(m))
+            }
+            Err(e) => {
+                warn!("⚠️  Failed to load model2vec from {}: {}. Using fallback hasher.", model_path, e);
+                None
+            }
+        };
+
+        let dimension = model.as_ref()
+            .map(|m| m.embedding_dim())
+            .unwrap_or(512); // Fallback dimension
 
         Ok(Self {
+            model,
             cache_pool: None,
             dimension,
         })
@@ -42,8 +60,23 @@ impl EmbeddingModel {
             }
         }
 
-        // 2. Генерируем эмбеддинг (демо-реализация)
-        let embedding_vec = self.generate_embedding(text);
+        // 2. Генерируем эмбеддинг
+        let embedding_vec = if let Some(model) = &self.model {
+            // ← Используем реальную модель
+            match model.encode([text]) {
+                Ok(embedding) => {
+                    let (vec, _offset) = embedding.into_raw_vec_and_offset();
+                    vec
+                }
+                Err(e) => {
+                    warn!("⚠️  model2vec encode failed: {}. Using fallback.", e);
+                    self.generate_fallback_embedding(text)
+                }
+            }
+        } else {
+            // Fallback если модель не загрузилась
+            self.generate_fallback_embedding(text)
+        };
 
         // 3. Сохраняем в кэш (если подключен)
         if let Some(pool) = &self.cache_pool {
@@ -64,11 +97,10 @@ impl EmbeddingModel {
         Ok(embeddings)
     }
 
-    /// Получение из кэша
+    /// ← ИСПРАВЛЕНО: Читаем как Vector, конвертируем в Vec<f32>
     async fn get_from_cache(&self, pool: &PgPool, text: &str) -> Result<Option<Vec<f32>>> {
         let text_hash = self.hash_text(text);
 
-        // ← Читаем как Vector, затем конвертируем в Vec<f32>
         let record: Option<Vector> = sqlx::query_scalar(
             r#"SELECT embedding FROM embedding_cache WHERE text_hash = $1"#
         )
@@ -77,15 +109,13 @@ impl EmbeddingModel {
         .await
         .map_err(|e| StorageError::Database(e.to_string()))?;
 
-        Ok(record.map(|v| v.to_vec()))  // ← Vector → Vec<f32>
+        Ok(record.map(|v| v.to_vec())) // Vector → Vec<f32>
     }
 
-    /// Сохранение в кэш
+    /// ← ИСПРАВЛЕНО: Конвертируем Vec<f32> в Vector перед записью
     async fn save_to_cache(&self, pool: &PgPool, text: &str, embedding: &[f32]) -> Result<()> {
         let text_hash = self.hash_text(text);
-
-        // ← Конвертируем Vec<f32> → Vector перед сохранением
-        let embedding_vector = Vector::from(embedding.to_vec());
+        let embedding_vector = Vector::from(embedding.to_vec()); // Vec<f32> → Vector
 
         sqlx::query(
             r#"
@@ -95,8 +125,8 @@ impl EmbeddingModel {
             "#
         )
         .bind(text_hash)
-        .bind(embedding_vector)  // ← Передаём Vector
-        .bind("model-v1")
+        .bind(embedding_vector) // ← Передаём Vector
+        .bind("model2vec-v1")
         .execute(pool)
         .await
         .map_err(|e| StorageError::Database(e.to_string()))?;
@@ -111,8 +141,8 @@ impl EmbeddingModel {
         format!("{:x}", hasher.finalize())
     }
 
-    /// Упрощённая генерация эмбеддинга (демо)
-    fn generate_embedding(&self, text: &str) -> Vec<f32> {
+    /// ← Fallback-генерация (если model2vec не загрузился)
+    fn generate_fallback_embedding(&self, text: &str) -> Vec<f32> {
         let mut hasher = Sha256::new();
         hasher.update(text.as_bytes());
         let hash_bytes = hasher.finalize();
