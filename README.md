@@ -5,6 +5,7 @@
 ```bash
 # 1. Запуск БД
 docker-compose up -d
+podman-compose up -d
 
 # 2. Установка sqlx-cli для миграций
 cargo install sqlx-cli
@@ -16,6 +17,7 @@ sqlx migrate run --database-url postgres://ai_gateway:dev_password@localhost:543
 sudo docker ps -a
 # уесли контейнер не запущен
 sudo docker start ai-gateway-postgres-1
+podman start ai-gateway-postgres-1
 cargo run
 
 # если без docker
@@ -31,4 +33,14 @@ TRUNCATE documents, chunks RESTART IDENTITY CASCADE;
 
 ```bash
 cargo check 2>&1 | tee build_error.log.txt
+```
+
+## Test
+
+```bash
+# Запустите тесты чанкера
+cargo test chunking::sentence
+
+# Запуск с логами
+RUST_LOG=ai_gateway=debug cargo run
 ```

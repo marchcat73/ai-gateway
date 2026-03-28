@@ -25,15 +25,20 @@ html2text = "0.6"
 thiserror = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-url = "2"
 anyhow = "1.0"
 dotenvy = "0.15"
+regex = "1"
 
 # Embeddings
 model2vec = "0.2"  # Model2Vec для быстрых эмбеддингов
 ndarray = "0.15"   # Для работы с векторами
 
-# Storage (опционально)
+# Сегментация текста по стандартам Unicode
+unicode-segmentation = "1.10"
+# Детекция языка (для улучшения качества)
+whatlang = "0.16"
+
+# Database + Vector
 sqlx = { version = "0.8.6", features = [
     "runtime-tokio-rustls",
     "postgres",
@@ -50,3 +55,14 @@ sha2 = "0.10"
 
 # Vector math (для косинусного сходства если нужно вручную)
 ndarray-linalg = { version = "0.16", features = ["openblas-system"] }
+
+# Парсинг sitemap.xml
+rss = "2.0"          # Поддерживает RSS/Atom, включая sitemap-расширения
+quick-xml = { version = "0.31", features = ["serialize"] }
+
+# Работа с путями и URL
+url = "2"
+pathdiff = "0.2"     # Для генерации относительных путей
+
+# Markdown утилиты (опционально)
+pulldown-cmark = "0.9"
