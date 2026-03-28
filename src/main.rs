@@ -1,4 +1,5 @@
-use ai_gateway::{crawler::Crawler, storage::PostgresStorage, storage::ContentStorage};
+use ai_gateway::storage::PostgresStorage;
+use ai_gateway::llms_txt::{LlmsGenerator, LlmsConfig, sitemap::SitemapCrawler};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -13,31 +14,41 @@ async fn main() -> anyhow::Result<()> {
         &database_url
     ).await?;
 
-    let crawler = Crawler::new();
+    // 2. Опционально: Краулинг sitemap
+    let do_crawl = std::env::var("CRAWL_SITEMAP").unwrap_or_default() == "true";
+    if do_crawl {
+        let sitemap_url = "https://habr.com/sitemap.xml"; // Пример
+        let config = LlmsConfig::default();
+        let crawler = SitemapCrawler::new(config);
 
-    // 2. Краулим и сохраняем
-    let url = "https://habr.com/ru/articles/752346/";
-    tracing::info!("🕷️  Crawling: {}", url);
-
-    match crawler.crawl(url).await {
-        Ok(content) => {
-            tracing::info!("✅ Extracted: {} ({} words)", content.title, content.word_count);
-
-            // 3. Сохраняем в БД (включая чанкинг и эмбеддинги)
-            storage.save(content).await?;
-            tracing::info!("💾 Saved to PostgreSQL with chunks");
-
-            // 4. Тест семантического поиска
-            let query = "о чем эта статья?";
-            let results = storage.search_semantic(query, 3).await?;
-            tracing::info!("🔍 Search results for '{}':", query);
-            for (i, chunk) in results.iter().enumerate() {
-                tracing::info!("  {}. [{}] {}", i+1, chunk.word_count,
-                    chunk.content.chars().take(100).collect::<String>());
-            }
-        }
-        Err(e) => tracing::error!("❌ Crawl failed: {}", e),
+        tracing::info!("🕷️  Starting sitemap crawl...");
+        let count = crawler.crawl_sitemap(sitemap_url, &storage, 5).await?;
+        tracing::info!("✅ Crawled {} new pages", count);
     }
+
+    // 3. Получаем данные из БД
+    tracing::info!("📚 Loading documents for llms.txt...");
+    let docs = storage.get_all_documents(100).await?;
+    let chunks = storage.get_all_chunks(1000).await?;
+
+    // 4. Генерация llms.txt
+    let llms_config = LlmsConfig {
+        site_url: "https://ai-gateway.example.com".to_string(),
+        site_name: "AI Gateway Demo".to_string(),
+        site_description: Some("Structured content index for AI agents".to_string()),
+        include_chunk_content: false,
+        max_links: 100,
+        ..Default::default()
+    };
+
+    let generator = LlmsGenerator::new(llms_config);
+    let result = generator.generate(&docs, &chunks);
+
+    // 5. Сохранение
+    generator.save_to_file(&result, "public/llms.txt")?;
+
+    tracing::info!("🎉 Pipeline completed: {} pages, {} chunks",
+        result.pages_count, result.chunks_count);
 
     Ok(())
 }

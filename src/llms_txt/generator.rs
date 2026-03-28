@@ -95,13 +95,14 @@ impl LlmsGenerator {
     fn make_chunk_references(&self, chunks: &[&ContentChunk]) -> Vec<ChunkReference> {
         let mut refs = Vec::with_capacity(chunks.len());
 
-        for (idx, chunk) in chunks.iter().enumerate() {
+        for (_idx, chunk) in chunks.iter().enumerate() {
             // Генерируем якорь: #chunk-{uuid-first-8-chars}
             let anchor = format!("#chunk-{}", chunk.id.to_string()[..8].to_string());
 
             // Превью: первые 100 символов контента
-            let preview = if chunk.content.len() > 100 {
-                format!("{}...", &chunk.content[..100])
+            let preview = if chunk.content.chars().count() > 100 {
+                let truncated: String = chunk.content.chars().take(100).collect();
+                format!("{}...", truncated)
             } else {
                 chunk.content.clone()
             };
@@ -232,5 +233,27 @@ Use the links below to access structured content chunks.
         std::fs::write(path, &result.content)?;
         info!("💾 Saved llms.txt to {}", path);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cyrillic_preview() {
+        let content = "Всем привет! Это тестовая статья на русском языке. ".repeat(10);
+
+        // Должно обрезать по символам, а не байтам
+        let preview = if content.chars().count() > 50 {
+            let truncated: String = content.chars().take(50).collect();
+            format!("{}...", truncated)
+        } else {
+            content.clone()
+        };
+
+        assert!(preview.ends_with("..."));
+        assert_eq!(preview.chars().count(), 53); // 50 + 3 точки
+        println!("Preview: {}", preview);
     }
 }

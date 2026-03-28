@@ -1,0 +1,41 @@
+# AI Gateway Demo
+
+> AI-Optimized Content Index
+> Generated: 2026-03-28 15:36 UTC
+> Language: en
+
+## About
+
+Structured content index for AI agents
+
+This index is optimized for AI agents and LLMs.
+Use the links below to access structured content chunks.
+
+## 🤖 For AI Agents
+
+- Each page link may contain `#chunk-XXXX` anchors for precise content access
+- Content is pre-chunked for efficient retrieval (RAG-friendly)
+- Use semantic search via the API for contextual queries
+
+## 📚 Content Index
+
+### [Простой способ проверять typescript без skipLibCheck: true](https://habr.com/ru/articles/752346/)
+
+> Всем привет! Решил начать писать короткие статьи с маленькими фичами, которые могут помочь посмотреть на решение проблем немного под другим углом.Дано:Мы использ...
+
+- **Language**: en
+- **Updated**: 2026-03-27
+
+_2 content chunks available (use anchors for precise access)_
+
+---
+
+
+## ℹ️ Metadata
+
+- **Total Pages**: 1
+- **Total Chunks**: 2
+- **Index Format**: llms.txt v1.0
+- **Generator**: AI Gateway
+
+> For questions or API access, contact: [support@ai-gateway.example.com](mailto:support@ai-gateway.example.com)

@@ -85,7 +85,6 @@ impl PostgresStorage {
 
     pub async fn run_migrations(&self) -> Result<()> {
         info!("📜 Running database migrations...");
-        // sqlx::migrate!("./migrations").run(&self.pool).await?;
         info!("✓ Migrations completed");
         Ok(())
     }
@@ -109,6 +108,90 @@ impl PostgresStorage {
             .map_err(|e| StorageError::Database(e.to_string()))?;
         Ok(())
     }
+
+    pub async fn get_all_documents(&self, limit: usize) -> Result<Vec<ExtractedContent>> {
+        let rows = sqlx::query_as::<_, DocumentRow>(
+            r#"
+            SELECT id, source_url, final_url, title, content_html, content_text,
+                   author, published_date, excerpt, image, language,
+                   word_count, crawled_at, meta, embedding
+            FROM documents
+            ORDER BY crawled_at DESC
+            LIMIT $1
+            "#
+        )
+        .bind(limit as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StorageError::Database(e.to_string()))?;
+
+        Ok(rows.into_iter().map(|r| ExtractedContent {
+            id: r.id,
+            source_url: r.source_url,
+            final_url: r.final_url,
+            title: r.title,
+            content_html: r.content_html.unwrap_or_default(),
+            content_text: r.content_text,
+            author: r.author,
+            published_date: r.published_date,
+            excerpt: r.excerpt,
+            image: r.image,
+            language: r.language,
+            word_count: r.word_count as usize,
+            crawled_at: r.crawled_at,
+            meta: r.meta,
+        }).collect())
+    }
+
+    pub async fn get_all_chunks(&self, limit: usize) -> Result<Vec<ContentChunk>> {
+        let rows = sqlx::query_as::<_, ChunkRow>(
+            r#"
+            SELECT id, document_id, chunk_index, title, content,
+                   content_html, word_count, start_char, end_char, meta
+            FROM chunks
+            ORDER BY document_id, chunk_index
+            LIMIT $1
+            "#
+        )
+        .bind(limit as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StorageError::Database(e.to_string()))?;
+
+        // Подгружаем URL документов
+        let doc_ids: Vec<Uuid> = rows.iter().map(|r| r.document_id).collect();
+        let doc_urls = if !doc_ids.is_empty() {
+            let docs = sqlx::query("SELECT id, source_url FROM documents WHERE id = ANY($1)")
+                .bind(&doc_ids)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| StorageError::Database(e.to_string()))?;
+
+            docs.into_iter()
+                .filter_map(|r| {
+                    let id = r.try_get::<Uuid, _>("id").ok()?;
+                    let url = r.try_get::<String, _>("source_url").ok()?;
+                    Some((id, url))
+                })
+                .collect::<std::collections::HashMap<_, _>>()
+        } else {
+            std::collections::HashMap::new()
+        };
+
+        Ok(rows.into_iter().map(|row| ContentChunk {
+            id: row.id,
+            source_id: row.document_id,
+            source_url: doc_urls.get(&row.document_id).cloned().unwrap_or_default(),
+            chunk_index: row.chunk_index as usize,
+            title: row.title,
+            content: row.content,
+            content_html: row.content_html,
+            word_count: row.word_count as usize,
+            start_char: row.start_char as usize,
+            end_char: row.end_char as usize,
+            meta: row.meta,
+        }).collect())
+    }
 }
 
 #[async_trait]
@@ -122,8 +205,6 @@ impl ContentStorage for PostgresStorage {
         // Генерируем и конвертируем эмбеддинг
         let doc_embedding = self.embedding_model.embed(&content.content_text).await?;
         let doc_embedding_vec = Vector::from(doc_embedding);  // ← Конвертация
-
-        tracing::debug!("📄 Document ID: {}, URL: {}", content.id, content.source_url);
 
         sqlx::query(
             r#"
@@ -161,18 +242,12 @@ impl ContentStorage for PostgresStorage {
         .await
         .map_err(|e| StorageError::Database(e.to_string()))?;
 
-        // Сохраняем чанки
         let mut chunks = self.chunker.chunk(&content, &self.chunk_config);
         info!("📝 Generated {} chunks", chunks.len());
 
-        // 🔑 ВАЖНО: Гарантируем, что source_id у чанков совпадает с id документа
         for chunk in &mut chunks {
-            chunk.source_id = content.id;  // ← Синхронизация!
-            chunk.source_url = content.final_url.clone();  // ← Также обновляем URL
-        }
-
-        for chunk in &chunks {
-            tracing::debug!("🔗 Chunk {} -> document_id: {}", chunk.id, chunk.source_id);
+            chunk.source_id = content.id;
+            chunk.source_url = content.final_url.clone();
         }
 
         for chunk in chunks {

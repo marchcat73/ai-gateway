@@ -39,6 +39,8 @@ dependencies = [
  "async-trait",
  "chrono",
  "dotenvy",
+ "flate2",
+ "futures",
  "html2text",
  "html5ever 0.39.0",
  "model2vec",

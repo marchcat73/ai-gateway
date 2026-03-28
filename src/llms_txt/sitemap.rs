@@ -1,9 +1,12 @@
 // src/llms_txt/sitemap.rs
 use quick_xml::de::from_str;
 use serde::Deserialize;
-use url::Url;
 use crate::llms_txt::LlmsConfig;
-use tracing::{info, warn};
+use crate::crawler::Crawler;
+use crate::storage::ContentStorage;
+use tracing::{info, warn, error};
+use std::future::Future;
+use std::pin::Pin;
 
 /// Элемент sitemap.xml
 #[derive(Debug, Deserialize, Clone)]
@@ -11,10 +14,6 @@ pub struct SitemapUrl {
     pub loc: String,
     #[serde(default)]
     pub lastmod: Option<String>,
-    #[serde(default)]
-    pub changefreq: Option<String>,
-    #[serde(default)]
-    pub priority: Option<f32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -34,58 +33,112 @@ struct SitemapRef {
     pub loc: String,
 }
 
-/// Загрузчик sitemap для построения структуры сайта
-pub struct SitemapLoader {
+/// Загрузчик sitemap с интеграцией краулера
+pub struct SitemapCrawler {
     config: LlmsConfig,
+    crawler: Crawler,
 }
 
-impl SitemapLoader {
+impl SitemapCrawler {
     pub fn new(config: LlmsConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            crawler: Crawler::new(),
+        }
+    }
+
+    /// Загрузка sitemap и краулинг всех URL
+    pub async fn crawl_sitemap<S: ContentStorage>(
+        &self,
+        sitemap_url: &str,
+        storage: &S,
+        max_pages: usize,
+    ) -> Result<usize, SitemapError> {
+        info!("🗺️  Loading sitemap: {}", sitemap_url);
+
+        let urls = self.load(sitemap_url).await?;
+        let filtered = self.filter_urls(urls);
+
+        info!("📑 Found {} URLs after filtering", filtered.len());
+
+        let mut crawled_count = 0;
+        for url_entry in filtered.iter().take(max_pages) {
+            // Проверяем, есть ли уже в БД
+            if storage.exists_by_url(&url_entry.loc).await.unwrap_or(false) {
+                info!("⏭️  Skipping (exists): {}", url_entry.loc);
+                continue;
+            }
+
+            // Краулим и сохраняем
+            match self.crawler.crawl(&url_entry.loc).await {
+                Ok(content) => {
+                    info!("✅ Crawled: {}", content.title);
+                    if let Err(e) = storage.save(content).await {
+                        error!("Failed to save {}: {}", url_entry.loc, e);
+                    } else {
+                        crawled_count += 1;
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to crawl {}: {}", url_entry.loc, e);
+                }
+            }
+        }
+
+        Ok(crawled_count)
     }
 
     /// Загрузка и парсинг sitemap.xml
-    pub async fn load(&self, sitemap_url: &str) -> Result<Vec<SitemapUrl>, SitemapError> {
-        info!("🗺️  Loading sitemap: {}", sitemap_url);
+    /// ← ИСПРАВЛЕНО: Возвращаем Pin<Box<Future>> для рекурсии
+    pub fn load<'a>(
+        &'a self,
+        sitemap_url: &'a str,
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<SitemapUrl>, SitemapError>> + Send + 'a>> {
+        Box::pin(async move {
+            info!("📥 Fetching: {}", sitemap_url);
 
-        let client = reqwest::Client::new();
-        let response = client
-            .get(sitemap_url)
-            .header("User-Agent", "AIGatewayBot/1.0")
-            .send()
-            .await
-            .map_err(|e| SitemapError::Fetch(e.to_string()))?;
+            let client = reqwest::Client::new();
+            let response = client
+                .get(sitemap_url)
+                .header("User-Agent", "AIGatewayBot/1.0")
+                .send()
+                .await
+                .map_err(|e| SitemapError::Fetch(e.to_string()))?;
 
-        let xml = response.text().await
-            .map_err(|e| SitemapError::Fetch(e.to_string()))?;
+            let xml = response.text().await
+                .map_err(|e| SitemapError::Fetch(e.to_string()))?;
 
-        // Пробуем распарсить как SitemapIndex (если есть вложенные sitemap)
-        if let Ok(index) = from_str::<SitemapIndex>(&xml) {
-            info!("📑 Found sitemap index with {} references", index.sitemaps.len());
+            // Пробуем распарсить как SitemapIndex
+            if let Ok(index) = from_str::<SitemapIndex>(&xml) {
+                info!("📑 Found sitemap index with {} references", index.sitemaps.len());
 
-            let mut all_urls = Vec::new();
-            for sitemap_ref in index.sitemaps {
-                match self.load(&sitemap_ref.loc).await {
-                    Ok(urls) => all_urls.extend(urls),
-                    Err(e) => warn!("Failed to load nested sitemap {}: {}", sitemap_ref.loc, e),
+                let mut all_urls = Vec::new();
+                for sitemap_ref in index.sitemaps {
+                    // ← Рекурсивный вызов теперь работает через Box::pin
+                    match self.load(&sitemap_ref.loc).await {
+                        Ok(urls) => {
+                            info!("✓ Loaded {} URLs from {}", urls.len(), sitemap_ref.loc);
+                            all_urls.extend(urls);
+                        }
+                        Err(e) => warn!("Failed to load nested sitemap {}: {}", sitemap_ref.loc, e),
+                    }
                 }
+                return Ok(all_urls);
             }
-            return Ok(all_urls);
-        }
 
-        // Парсим как обычный Sitemap
-        let sitemap: Sitemap = from_str(&xml)
-            .map_err(|e| SitemapError::Parse(e.to_string()))?;
+            // Парсим как обычный Sitemap
+            let sitemap: Sitemap = from_str(&xml)
+                .map_err(|e| SitemapError::Parse(e.to_string()))?;
 
-        info!("✓ Parsed {} URLs from sitemap", sitemap.urls.len());
-        Ok(sitemap.urls)
+            info!("✓ Parsed {} URLs from sitemap", sitemap.urls.len());
+            Ok(sitemap.urls)
+        })
     }
 
     /// Фильтрация URL по конфигурации
     pub fn filter_urls(&self, urls: Vec<SitemapUrl>) -> Vec<SitemapUrl> {
         urls.into_iter()
             .filter(|url_entry| {
-                // Проверяем исключённые паттерны
                 !self.config.exclude_patterns.iter().any(|pattern| {
                     regex::Regex::new(pattern)
                         .map(|re| re.is_match(&url_entry.loc))
@@ -94,41 +147,6 @@ impl SitemapLoader {
             })
             .collect()
     }
-
-    /// Преобразование SitemapUrl в LlmsEntry (заглушка)
-    pub fn to_llms_entry(&self, sitemap_url: &SitemapUrl) -> Option<crate::llms_txt::LlmsEntry> {
-        // Для полноценной реализации нужен краулер для получения контента
-        // Здесь возвращаем базовую структуру
-        Some(crate::llms_txt::LlmsEntry {
-            title: extract_title_from_url(&sitemap_url.loc),
-            url: sitemap_url.loc.clone(),
-            description: None,
-            language: Some(self.config.default_language.clone()),
-            updated: sitemap_url.lastmod
-                .as_ref()
-                .and_then(|d| chrono::DateTime::parse_from_rfc3339(d).ok())
-                .map(|dt| dt.with_timezone(&chrono::Utc)),
-            chunks: vec![],
-            tags: vec![],
-        })
-    }
-}
-
-fn extract_title_from_url(url: &str) -> String {
-    Url::parse(url)
-        .ok()
-        .and_then(|u| u.path_segments())
-        .and_then(|mut segs| segs.last().map(str::to_string))
-        .map(|s| s.replace('-', " ").replace('_', " "))
-        .map(|s| {
-            // Capitalize first letter
-            let mut c = s.chars();
-            match c.next() {
-                None => String::new(),
-                Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-            }
-        })
-        .unwrap_or_else(|| "Untitled".to_string())
 }
 
 #[derive(Debug, thiserror::Error)]

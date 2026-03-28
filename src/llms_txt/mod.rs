@@ -1,10 +1,10 @@
 // src/llms_txt/mod.rs
 pub mod generator;
+pub use generator::LlmsGenerator;
 pub mod sitemap;
 
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
 
 /// Конфигурация генератора llms.txt
 #[derive(Debug, Clone, Serialize, Deserialize)]

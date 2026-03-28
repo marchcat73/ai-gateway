@@ -7,6 +7,8 @@ edition = "2021"
 # Core async
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
+futures = "0.3"
+flate2 = "1.0"
 
 # HTTP & Parsing
 reqwest = { version = "0.11", features = ["json", "rustls-tls", "gzip"], default-features = false }

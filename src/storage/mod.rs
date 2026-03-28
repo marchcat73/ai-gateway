@@ -34,4 +34,9 @@ pub trait ContentStorage: Send + Sync {
 
     /// Семантический поиск по чанкам
     async fn search_semantic(&self, query: &str, limit: usize) -> Result<Vec<ContentChunk>>;
+
+    /// Проверка существования документа по URL
+    async fn exists_by_url(&self, url: &str) -> Result<bool> {
+        Ok(self.get_by_url(url).await?.is_some())
+    }
 }
