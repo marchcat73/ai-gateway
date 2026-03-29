@@ -1,2 +1,159 @@
-    Checking ai-gateway v0.1.0 (/home/marchcat/projects/ai-gateway)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.67s
+    Checking ai-gateway v0.1.0 (/home/user/projects/ai-gateway)
+error: error returned from database: relation "sites" does not exist
+   --> src/storage/db.rs:256:16
+    |
+256 |       let site = sqlx::query_as!(
+    |  ________________^
+257 | |         Site,
+258 | |         r#"
+259 | |         SELECT
+...   |
+266 | |         site_key
+267 | |     )
+    | |_____^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: relation "sites" does not exist
+   --> src/storage/db.rs:277:21
+    |
+277 |           let sites = sqlx::query_as!(
+    |  _____________________^
+278 | |             Site,
+279 | |             r#"
+280 | |             SELECT
+...   |
+287 | |             "#
+288 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: column "site_key" does not exist
+   --> src/storage/db.rs:402:20
+    |
+402 |           let rows = sqlx::query_as!(
+    |  ____________________^
+403 | |             DocumentRow,
+404 | |             r#"
+405 | |             SELECT
+...   |
+415 | |             limit as i64
+416 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: column d.site_key does not exist
+   --> src/storage/db.rs:441:20
+    |
+441 |           let rows = sqlx::query_as!(
+    |  ____________________^
+442 | |             ChunkRow,
+443 | |             r#"
+444 | |             SELECT c.id, c.document_id, c.chunk_index, c.title, c.content,
+...   |
+453 | |             limit as i64
+454 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0282]: type annotations needed
+   --> src/storage/db.rs:256:16
+    |
+256 |       let site = sqlx::query_as!(
+    |  ________________^
+257 | |         Site,
+258 | |         r#"
+259 | |         SELECT
+...   |
+268 | |     .fetch_optional(&self.pool)
+269 | |     .await
+    | |__________^ cannot infer type
+
+error[E0282]: type annotations needed
+   --> src/storage/db.rs:270:15
+    |
+270 |     .map_err(|e| StorageError::Database(e.to_string()))?;
+    |               ^                         - type must be known at this point
+    |
+help: consider giving this closure parameter an explicit type
+    |
+270 |     .map_err(|e: /* Type */| StorageError::Database(e.to_string()))?;
+    |                ++++++++++++
+
+error[E0282]: type annotations needed
+   --> src/storage/db.rs:277:21
+    |
+277 |           let sites = sqlx::query_as!(
+    |  _____________________^
+278 | |             Site,
+279 | |             r#"
+280 | |             SELECT
+...   |
+289 | |         .fetch_all(&self.pool)
+290 | |         .await
+    | |______________^ cannot infer type
+
+error[E0282]: type annotations needed
+   --> src/storage/db.rs:291:19
+    |
+291 |         .map_err(|e| StorageError::Database(e.to_string()))?;
+    |                   ^                         - type must be known at this point
+    |
+help: consider giving this closure parameter an explicit type
+    |
+291 |         .map_err(|e: /* Type */| StorageError::Database(e.to_string()))?;
+    |                    ++++++++++++
+
+error[E0282]: type annotations needed
+   --> src/storage/db.rs:402:20
+    |
+402 |           let rows = sqlx::query_as!(
+    |  ____________________^
+403 | |             DocumentRow,
+404 | |             r#"
+405 | |             SELECT
+...   |
+417 | |         .fetch_all(&self.pool)
+418 | |         .await
+    | |______________^ cannot infer type
+
+error[E0282]: type annotations needed
+   --> src/storage/db.rs:419:19
+    |
+419 |         .map_err(|e| StorageError::Database(e.to_string()))?;
+    |                   ^                         - type must be known at this point
+    |
+help: consider giving this closure parameter an explicit type
+    |
+419 |         .map_err(|e: /* Type */| StorageError::Database(e.to_string()))?;
+    |                    ++++++++++++
+
+error[E0282]: type annotations needed
+   --> src/storage/db.rs:441:20
+    |
+441 |           let rows = sqlx::query_as!(
+    |  ____________________^
+442 | |             ChunkRow,
+443 | |             r#"
+444 | |             SELECT c.id, c.document_id, c.chunk_index, c.title, c.content,
+...   |
+455 | |         .fetch_all(&self.pool)
+456 | |         .await
+    | |______________^ cannot infer type
+
+error[E0282]: type annotations needed
+   --> src/storage/db.rs:457:19
+    |
+457 |         .map_err(|e| StorageError::Database(e.to_string()))?;
+    |                   ^                         - type must be known at this point
+    |
+help: consider giving this closure parameter an explicit type
+    |
+457 |         .map_err(|e: /* Type */| StorageError::Database(e.to_string()))?;
+    |                    ++++++++++++
+
+For more information about this error, try `rustc --explain E0282`.
+error: could not compile `ai-gateway` (lib) due to 12 previous errors

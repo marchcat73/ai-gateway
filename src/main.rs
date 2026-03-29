@@ -17,7 +17,7 @@ async fn main() -> anyhow::Result<()> {
     // 2. Опционально: Краулинг sitemap
     let do_crawl = std::env::var("CRAWL_SITEMAP").unwrap_or_default() == "true";
     if do_crawl {
-        let sitemap_url = "https://marchcat.com/sitemap-0.xml"; // Пример
+        let sitemap_url = "https://newscryptonft.com/sitemap-0.xml"; // Пример
         let config = LlmsConfig::default();
         let crawler = SitemapCrawler::new(config);
 
@@ -33,11 +33,11 @@ async fn main() -> anyhow::Result<()> {
 
     // 4. Генерация llms.txt
     let llms_config = LlmsConfig {
-        site_url: "https://marchcat.com".to_string(),
-        site_name: "NFT collections".to_string(),
-        site_description: Some("NFT collections. Cryptocurrency reviews and news".to_string()),
+        site_url: "https://newscryptonft.com".to_string(),
+        site_name: "News Crypto NFT".to_string(),
+        site_description: Some("News Crypto NFT. Cryptocurrency reviews and news".to_string()),
         include_chunk_content: false,
-        max_links: 100,
+        max_links: 7000,
         ..Default::default()
     };
 

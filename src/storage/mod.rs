@@ -1,5 +1,6 @@
 pub mod db;
 pub mod embeddings;
+pub mod types;
 
 use async_trait::async_trait;
 
