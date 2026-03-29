@@ -17,7 +17,7 @@ async fn main() -> anyhow::Result<()> {
     // 2. Опционально: Краулинг sitemap
     let do_crawl = std::env::var("CRAWL_SITEMAP").unwrap_or_default() == "true";
     if do_crawl {
-        let sitemap_url = "https://marchcat.com/sitemap.xml"; // Пример
+        let sitemap_url = "https://marchcat.com/sitemap-0.xml"; // Пример
         let config = LlmsConfig::default();
         let crawler = SitemapCrawler::new(config);
 

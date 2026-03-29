@@ -1,7 +1,7 @@
 # AI Gateway Demo
 
 > AI-Optimized Content Index
-> Generated: 2026-03-28 17:38 UTC
+> Generated: 2026-03-29 11:05 UTC
 > Language: en
 
 ## About
@@ -19,22 +19,51 @@ Use the links below to access structured content chunks.
 
 ## 📚 Content Index
 
-### [Простой способ проверять typescript без skipLibCheck: true](https://habr.com/ru/articles/752346/)
+### [NFT collections](https://marchcat.com/)
 
-> Всем привет! Решил начать писать короткие статьи с маленькими фичами, которые могут помочь посмотреть на решение проблем немного под другим углом.Дано:Мы использ...
+> Cryptocurrency reviews and news
 
 - **Language**: en
-- **Updated**: 2026-03-27
+- **Updated**: 2026-03-29
+
+---
+
+### [Cryptocurrency Actions](https://marchcat.com/actions/)
+
+> Stay up-to-date on all the latest trends, developments, and insights in the rapidly evolving cryptocurrency market. From Bitcoin to Ethereum, Altcoins to DeFi, we've got you covered with the most comprehensive and timely news. Remember, knowledge is power - especially in the world of crypto!
+
+- **Language**: en
+- **Updated**: 2026-03-29
+
+_1 content chunks available (use anchors for precise access)_
+
+---
+
+### [Cryptocurrency Sensation: Insiders Reveal Elon Musk's Secret Investment That Could Grow by 500,000%](https://marchcat.com/actions/cryptocurrency-sensation-insiders-reveal-elon-musk-secret-investment-that-could-grow-by-500/)
+
+> Rumors are swirling about new, mysterious tokens discovered in Elon Musk's wallet. Experts predict that the project he is launching could revolutionize the cryptocurrency world. They're talking about growth potential that could exceed 500,000%, and even match the success of Shiba Inu token, which grew by 71,250,000%.
+
+- **Language**: en
+- **Updated**: 2026-03-29
 
 _2 content chunks available (use anchors for precise access)_
+
+---
+
+### [The Cryptocurrency Guide](https://marchcat.com/guide/)
+
+> The Cryptocurrency Guide
+
+- **Language**: en
+- **Updated**: 2026-03-29
 
 ---
 
 
 ## ℹ️ Metadata
 
-- **Total Pages**: 1
-- **Total Chunks**: 2
+- **Total Pages**: 4
+- **Total Chunks**: 3
 - **Index Format**: llms.txt v1.0
 - **Generator**: AI Gateway
 
