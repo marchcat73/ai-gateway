@@ -20,6 +20,9 @@ sudo docker start ai-gateway-postgres-1
 podman start ai-gateway-postgres-1
 cargo run
 
+# Очистка
+podman-compose down --volumes --rmi all
+
 # если без docker
 sudo -u postgres psql
 CREATE USER ai_gateway WITH PASSWORD 'dev_password';

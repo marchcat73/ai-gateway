@@ -22,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
         let crawler = SitemapCrawler::new(config);
 
         tracing::info!("🕷️  Starting sitemap crawl...");
-        let count = crawler.crawl_sitemap(sitemap_url, &storage, 5).await?;
+        let count = crawler.crawl_sitemap(sitemap_url, &storage, 1000).await?;
         tracing::info!("✅ Crawled {} new pages", count);
     }
 
@@ -34,8 +34,8 @@ async fn main() -> anyhow::Result<()> {
     // 4. Генерация llms.txt
     let llms_config = LlmsConfig {
         site_url: "https://marchcat.com".to_string(),
-        site_name: "AI Gateway Demo".to_string(),
-        site_description: Some("Structured content index for AI agents".to_string()),
+        site_name: "NFT collections".to_string(),
+        site_description: Some("NFT collections. Cryptocurrency reviews and news".to_string()),
         include_chunk_content: false,
         max_links: 100,
         ..Default::default()
