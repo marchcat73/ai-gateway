@@ -1,5 +1,6 @@
+// src/main.rs
 use ai_gateway::storage::PostgresStorage;
-use ai_gateway::llms_txt::{LlmsGenerator, LlmsConfig, sitemap::SitemapCrawler};
+use ai_gateway::llms_txt::sitemap::SitemapCrawler;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -8,47 +9,51 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     dotenvy::dotenv().ok();
+
     let database_url = std::env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set");
-    let storage = PostgresStorage::connect(
-        &database_url
-    ).await?;
 
-    // 2. Опционально: Краулинг sitemap
-    let do_crawl = std::env::var("CRAWL_SITEMAP").unwrap_or_default() == "true";
-    if do_crawl {
-        let sitemap_url = "https://newscryptonft.com/sitemap-0.xml"; // Пример
-        let config = LlmsConfig::default();
-        let crawler = SitemapCrawler::new(config);
+    let storage = PostgresStorage::connect(&database_url).await?;
 
-        tracing::info!("🕷️  Starting sitemap crawl...");
-        let count = crawler.crawl_sitemap(sitemap_url, &storage, 1000).await?;
-        tracing::info!("✅ Crawled {} new pages", count);
+    // === 1. Краулинг для каждого сайта ===
+    let sites = vec![
+        // Ваш пример:
+        ("newscryptonft.com", "News Crypto NFT", "https://newscryptonft.com/sitemap.xml"),
+        // Добавьте другие сайты:
+        // ("habr.com", "Habr", "https://habr.com/sitemap.xml"),
+    ];
+
+    for (site_key, site_name, sitemap_url) in sites {
+        if std::env::var("CRAWL_SITEMAP").unwrap_or_default() == "true" {
+            tracing::info!("🕷️  Crawling sitemap for {}...", site_key);
+
+            let crawler = SitemapCrawler::new(Default::default());
+            let count = crawler.crawl_sitemap_with_site(
+                sitemap_url,
+                &storage,
+                site_key,  // ← Передаём site_key
+                7000         // max_pages per site
+            ).await?;
+
+            tracing::info!("✅ Crawled {} pages for {}", count, site_key);
+        }
     }
 
-    // 3. Получаем данные из БД
-    tracing::info!("📚 Loading documents for llms.txt...");
-    let docs = storage.get_all_documents(100).await?;
-    let chunks = storage.get_all_chunks(1000).await?;
+    // === 2. Генерация llms.txt для каждого сайта ===
+    let active_sites = storage.get_active_sites().await?;
 
-    // 4. Генерация llms.txt
-    let llms_config = LlmsConfig {
-        site_url: "https://newscryptonft.com".to_string(),
-        site_name: "News Crypto NFT".to_string(),
-        site_description: Some("News Crypto NFT. Cryptocurrency reviews and news".to_string()),
-        include_chunk_content: false,
-        max_links: 7000,
-        ..Default::default()
-    };
+    for site in active_sites {
+        tracing::info!("📝 Generating llms.txt for {}...", site.site_key);
 
-    let generator = LlmsGenerator::new(llms_config);
-    let result = generator.generate(&docs, &chunks);
+        let result = storage.generate_llms_for_site(
+            &site.site_key,
+            &format!("public/{}", site.site_key)  // public/newscryptonft.com/llms.txt
+        ).await?;
 
-    // 5. Сохранение
-    generator.save_to_file(&result, "public/llms.txt")?;
+        tracing::info!("✓ Generated: {} pages, {} chunks for {}",
+            result.pages_count, result.chunks_count, site.site_key);
+    }
 
-    tracing::info!("🎉 Pipeline completed: {} pages, {} chunks",
-        result.pages_count, result.chunks_count);
-
+    tracing::info!("🎉 Pipeline completed!");
     Ok(())
 }

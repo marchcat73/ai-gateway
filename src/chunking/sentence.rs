@@ -214,6 +214,8 @@ mod tests {
             word_count: 15,
             crawled_at: Utc::now(),
             meta: serde_json::Value::Null,
+            site_id: None,
+            site_key: None,
         };
 
         let config = ChunkingConfig {

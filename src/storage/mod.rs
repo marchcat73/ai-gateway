@@ -40,4 +40,11 @@ pub trait ContentStorage: Send + Sync {
     async fn exists_by_url(&self, url: &str) -> Result<bool> {
         Ok(self.get_by_url(url).await?.is_some())
     }
+
+    // ← ДОБАВИТЬ: сохранение с привязкой к сайту
+    async fn save_with_site(&self, content: ExtractedContent, site_key: &str) -> Result<()> {
+        // Реализация по умолчанию: просто вызываем save()
+        // Конкретные реализации могут переопределить это поведение
+        self.save(content).await
+    }
 }

@@ -69,6 +69,8 @@ impl Parser {
                 "excerpt_len": excerpt_len,
                 "content_len": content_len,
             }),
+            site_id: None,
+            site_key: None,
         })
     }
 }

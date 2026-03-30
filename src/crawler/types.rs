@@ -18,7 +18,9 @@ pub struct ExtractedContent {
     pub language: Option<String>,
     pub word_count: usize,
     pub crawled_at: DateTime<Utc>,
-    pub meta: serde_json::Value, // Дополнительные meta-теги
+    pub meta: serde_json::Value,
+    pub site_id: Option<Uuid>,
+    pub site_key: Option<String>,
 }
 
 #[derive(Debug, thiserror::Error)]

@@ -47,6 +47,55 @@ impl SitemapCrawler {
         }
     }
 
+    // src/llms_txt/sitemap.rs - добавьте этот метод в impl SitemapCrawler
+
+    /// Загрузка sitemap и краулинг с привязкой к конкретному сайту
+    pub async fn crawl_sitemap_with_site<S: ContentStorage>(
+        &self,
+        sitemap_url: &str,
+        storage: &S,
+        site_key: &str,  // ← Новый параметр
+        max_pages: usize,
+    ) -> Result<usize, SitemapError> {
+        info!("🗺️  Loading sitemap for site {}: {}", site_key, sitemap_url);
+
+        let urls = self.load(sitemap_url).await?;
+        let filtered = self.filter_urls(urls);
+
+        info!("📑 Found {} URLs after filtering", filtered.len());
+
+        let mut crawled_count = 0;
+        for url_entry in filtered.iter().take(max_pages) {
+            // Проверяем, есть ли уже в БД
+            if storage.exists_by_url(&url_entry.loc).await.unwrap_or(false) {
+                info!("⏭️  Skipping (exists): {}", url_entry.loc);
+                continue;
+            }
+
+            // Краулим
+            match self.crawler.crawl(&url_entry.loc).await {
+                Ok(mut content) => {
+                    // ← КЛЮЧЕВОЕ: привязываем контент к сайту перед сохранением
+                    content.site_key = Some(site_key.to_string());
+
+                    info!("✅ Crawled: {}", content.title);
+
+                    // Используем save_with_site вместо save
+                    if let Err(e) = storage.save_with_site(content, site_key).await {
+                        error!("Failed to save {}: {}", url_entry.loc, e);
+                    } else {
+                        crawled_count += 1;
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to crawl {}: {}", url_entry.loc, e);
+                }
+            }
+        }
+
+        Ok(crawled_count)
+    }
+
     /// Загрузка sitemap и краулинг всех URL
     pub async fn crawl_sitemap<S: ContentStorage>(
         &self,

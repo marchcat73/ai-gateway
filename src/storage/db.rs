@@ -144,6 +144,8 @@ impl PostgresStorage {
             word_count: r.word_count as usize,
             crawled_at: r.crawled_at,
             meta: r.meta,
+            site_id: r.site_id,
+            site_key: r.site_key,
         }).collect())
     }
 
@@ -294,109 +296,109 @@ pub async fn get_site_by_key(&self, site_key: &str) -> Result<Option<Site>> {
         Ok(sites)
     }
 
-/// Обновление документа с привязкой к сайту
-pub async fn save_with_site(
-    &self,
-    content: ExtractedContent,
-    site_key: &str,
-) -> Result<()> {
-    // Получаем или создаём сайт
-    let site = self.get_or_create_site(
-        site_key,
-        &extract_site_name(site_key),
-        &normalize_site_url(site_key),
-    ).await?;
+    /// Обновление документа с привязкой к сайту
+    pub async fn save_with_site_impl(
+        &self,
+        content: ExtractedContent,
+        site_key: &str,
+    ) -> Result<()> {
+        // Получаем или создаём сайт
+        let site = self.get_or_create_site(
+            site_key,
+            &extract_site_name(site_key),
+            &normalize_site_url(site_key),
+        ).await?;
 
-    // Проверяем, должен ли этот URL быть включён
-    if !site.should_include_url(&content.source_url) {
-        tracing::debug!("⏭️  URL excluded by site filters: {}", content.source_url);
-        return Ok(());
-    }
+        // Проверяем, должен ли этот URL быть включён
+        if !site.should_include_url(&content.source_url) {
+            tracing::debug!("⏭️  URL excluded by site filters: {}", content.source_url);
+            return Ok(());
+        }
 
-    let mut tx = self.pool.begin().await
-        .map_err(|e| StorageError::Database(e.to_string()))?;
+        let mut tx = self.pool.begin().await
+            .map_err(|e| StorageError::Database(e.to_string()))?;
 
-    // Сохраняем документ с site_id
-    let doc_embedding = self.embedding_model.embed(&content.content_text).await?;
-    let doc_embedding_vec = pgvector::Vector::from(doc_embedding);
-
-    sqlx::query(
-        r#"
-        INSERT INTO documents (
-            id, source_url, final_url, title, content_html,
-            content_text, author, published_date, excerpt,
-            image, language, word_count, crawled_at, meta,
-            embedding, site_id, site_key
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-        ON CONFLICT (source_url) DO UPDATE SET
-            site_id = EXCLUDED.site_id,
-            site_key = EXCLUDED.site_key,
-            content_text = EXCLUDED.content_text,
-            crawled_at = EXCLUDED.crawled_at,
-            embedding = EXCLUDED.embedding
-        "#
-    )
-    .bind(content.id)
-    .bind(&content.source_url)
-    .bind(&content.final_url)
-    .bind(&content.title)
-    .bind(&content.content_html)
-    .bind(&content.content_text)
-    .bind(&content.author)
-    .bind(content.published_date)
-    .bind(&content.excerpt)
-    .bind(&content.image)
-    .bind(&content.language)
-    .bind(content.word_count as i32)
-    .bind(content.crawled_at)
-    .bind(serde_json::to_value(&content.meta).unwrap_or_default())
-    .bind(doc_embedding_vec)
-    .bind(site.id)
-    .bind(&site.site_key)  // Денормализация для быстрых фильтров
-    .execute(&mut *tx)
-    .await
-    .map_err(|e| StorageError::Database(e.to_string()))?;
-
-    // Сохраняем чанки (они наследуют site_id через document_id)
-    let mut chunks = self.chunker.chunk(&content, &self.chunk_config);
-    for chunk in &mut chunks {
-        chunk.source_id = content.id;  // Синхронизация
-    }
-
-    for chunk in chunks {
-        let chunk_embedding = self.embedding_model.embed(&chunk.content).await?;
-        let chunk_embedding_vec = pgvector::Vector::from(chunk_embedding);
+        // Сохраняем документ с site_id
+        let doc_embedding = self.embedding_model.embed(&content.content_text).await?;
+        let doc_embedding_vec = pgvector::Vector::from(doc_embedding);
 
         sqlx::query(
             r#"
-            INSERT INTO chunks (
-                id, document_id, chunk_index, title, content,
-                content_html, word_count, start_char, end_char,
-                meta, embedding
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            INSERT INTO documents (
+                id, source_url, final_url, title, content_html,
+                content_text, author, published_date, excerpt,
+                image, language, word_count, crawled_at, meta,
+                embedding, site_id, site_key
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+            ON CONFLICT (source_url) DO UPDATE SET
+                site_id = EXCLUDED.site_id,
+                site_key = EXCLUDED.site_key,
+                content_text = EXCLUDED.content_text,
+                crawled_at = EXCLUDED.crawled_at,
+                embedding = EXCLUDED.embedding
             "#
         )
-        .bind(chunk.id)
-        .bind(chunk.source_id)  // Связь с документом → сайт
-        .bind(chunk.chunk_index as i32)
-        .bind(chunk.title)
-        .bind(&chunk.content)
-        .bind(&chunk.content_html)
-        .bind(chunk.word_count as i32)
-        .bind(chunk.start_char as i32)
-        .bind(chunk.end_char as i32)
-        .bind(serde_json::to_value(&chunk.meta).unwrap_or_default())
-        .bind(chunk_embedding_vec)
+        .bind(content.id)
+        .bind(&content.source_url)
+        .bind(&content.final_url)
+        .bind(&content.title)
+        .bind(&content.content_html)
+        .bind(&content.content_text)
+        .bind(&content.author)
+        .bind(content.published_date)
+        .bind(&content.excerpt)
+        .bind(&content.image)
+        .bind(&content.language)
+        .bind(content.word_count as i32)
+        .bind(content.crawled_at)
+        .bind(serde_json::to_value(&content.meta).unwrap_or_default())
+        .bind(doc_embedding_vec)
+        .bind(site.id)
+        .bind(&site.site_key)  // Денормализация для быстрых фильтров
         .execute(&mut *tx)
         .await
         .map_err(|e| StorageError::Database(e.to_string()))?;
+
+        // Сохраняем чанки (они наследуют site_id через document_id)
+        let mut chunks = self.chunker.chunk(&content, &self.chunk_config);
+        for chunk in &mut chunks {
+            chunk.source_id = content.id;  // Синхронизация
+        }
+
+        for chunk in chunks {
+            let chunk_embedding = self.embedding_model.embed(&chunk.content).await?;
+            let chunk_embedding_vec = pgvector::Vector::from(chunk_embedding);
+
+            sqlx::query(
+                r#"
+                INSERT INTO chunks (
+                    id, document_id, chunk_index, title, content,
+                    content_html, word_count, start_char, end_char,
+                    meta, embedding
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                "#
+            )
+            .bind(chunk.id)
+            .bind(chunk.source_id)  // Связь с документом → сайт
+            .bind(chunk.chunk_index as i32)
+            .bind(chunk.title)
+            .bind(&chunk.content)
+            .bind(&chunk.content_html)
+            .bind(chunk.word_count as i32)
+            .bind(chunk.start_char as i32)
+            .bind(chunk.end_char as i32)
+            .bind(serde_json::to_value(&chunk.meta).unwrap_or_default())
+            .bind(chunk_embedding_vec)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| StorageError::Database(e.to_string()))?;
+        }
+
+        tx.commit().await
+            .map_err(|e| StorageError::Database(e.to_string()))?;
+
+        Ok(())
     }
-
-    tx.commit().await
-        .map_err(|e| StorageError::Database(e.to_string()))?;
-
-    Ok(())
-}
 
     /// Получение документов конкретного сайта
     pub async fn get_documents_by_site(&self, site_key: &str, limit: usize) -> Result<Vec<ExtractedContent>> {
@@ -434,6 +436,8 @@ pub async fn save_with_site(
             word_count: r.word_count as usize,
             crawled_at: r.crawled_at,
             meta: r.meta,
+            site_id: r.site_id,
+            site_key: r.site_key,
         }).collect())
     }
 
@@ -503,7 +507,7 @@ pub async fn save_with_site(
             .ok_or_else(|| StorageError::NotFound(format!("Site not found: {}", site_key)))?;
 
         // Получаем документы и чанки сайта
-        let docs = self.get_documents_by_site(site_key, 1000).await?;
+        let docs = self.get_documents_by_site(site_key, 7000).await?;
         let chunks = self.get_chunks_by_site(site_key, 5000).await?;
 
         // Настраиваем генератор под сайт
@@ -512,8 +516,8 @@ pub async fn save_with_site(
             site_name: site.site_name.clone(),
             site_description: site.site_description.clone(),
             default_language: site.default_language.clone().unwrap_or_else(|| "en".to_string()),
-            include_chunk_content: false,
-            max_links: 100,
+            include_chunk_content: true,
+            max_links: 7000,
             exclude_patterns: site.exclude_patterns.clone().unwrap_or_default(),
             ..Default::default()
         };
@@ -656,6 +660,8 @@ impl ContentStorage for PostgresStorage {
             word_count: r.word_count as usize,
             crawled_at: r.crawled_at,
             meta: r.meta,
+            site_id: r.site_id,
+            site_key: r.site_key,
         }))
     }
 
@@ -717,5 +723,10 @@ impl ContentStorage for PostgresStorage {
 
         info!("✓ Found {} chunks", chunks.len());
         Ok(chunks)
+    }
+
+    // Переопределяем default impl для эффективной реализации
+    async fn save_with_site(&self, content: ExtractedContent, site_key: &str) -> Result<()> {
+        self.save_with_site_impl(content, site_key).await  // Вызов собственного метода
     }
 }

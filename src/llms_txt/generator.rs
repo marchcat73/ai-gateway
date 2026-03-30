@@ -7,6 +7,24 @@ use url::Url;
 use std::collections::BTreeMap; // Для сортировки по URL
 use tracing::{info, debug};
 
+// ============================================================================
+// Утилита для экранирования Markdown-символов
+// ============================================================================
+
+/// Экранирует специальные символы Markdown в тексте
+/// Предотвращает поломку форматирования при вставке пользовательского контента
+fn escape_markdown(text: &str) -> String {
+    text.replace('\\', "\\\\")  // Сначала экранируем обратные слеши
+        .replace('*', "\\*")
+        .replace('_', "\\_")
+        .replace('[', "\\[")
+        .replace(']', "\\]")
+        .replace('`', "\\`")
+        .replace('#', "\\#")    // Опционально: экранировать заголовки
+        .replace('|', "\\|")    // Для таблиц
+        .replace('>', "\\>")    // Для цитат
+}
+
 /// Основной генератор llms.txt
 pub struct LlmsGenerator {
     config: LlmsConfig,
@@ -96,19 +114,24 @@ impl LlmsGenerator {
         let mut refs = Vec::with_capacity(chunks.len());
 
         for (_idx, chunk) in chunks.iter().enumerate() {
-            // Генерируем якорь: #chunk-{uuid-first-8-chars}
-            let anchor = format!("#chunk-{}", chunk.id.to_string()[..8].to_string());
 
-            // Превью: первые 100 символов контента
-            let preview = if chunk.content.chars().count() > 100 {
+            let anchor_id = format!("chunk-{}", &chunk.id.to_string()[..8]);  // без # для id
+            let anchor_link = format!("#{}", anchor_id);
+
+            // ← ИСПРАВЛЕНО: Экранируем Markdown в превью
+            let preview_raw = if chunk.content.len() > 100 {
                 let truncated: String = chunk.content.chars().take(100).collect();
                 format!("{}...", truncated)
             } else {
                 chunk.content.clone()
             };
 
+            // ← Экранируем специальные символы
+            let preview = escape_markdown(&preview_raw);
+
             refs.push(ChunkReference {
-                anchor,
+                anchor: anchor_id,
+                anchor_link: Some(anchor_link),
                 preview,
                 position: chunk.chunk_index,
             });
@@ -186,11 +209,18 @@ Use the links below to access structured content chunks.
             if !entry.chunks.is_empty() && self.config.include_chunk_content {
                 md.push_str("#### Content Chunks\n\n");
                 for chunk in &entry.chunks {
+                    let anchor_id = &chunk.anchor;  // "chunk-3bbc941e" (без #)
+                    let anchor_href = format!("#{}", anchor_id);  // "#chunk-3bbc941e" (с #)
+
+                    // ← Экранируем превью ещё раз на всякий случай (защита в глубину)
+                    let preview_escaped = escape_markdown(&chunk.preview);
+
                     md.push_str(&format!(
-                        "- <a id=\"{anchor}\"></a>[`{anchor}`]({url}{anchor}): {preview}\n",
-                        anchor = chunk.anchor,
+                        "- <a id=\"{anchor_id}\"></a>[`{anchor_href}`]({url}{anchor_href}): {preview}\n",
+                        anchor_id = anchor_id,
+                        anchor_href = anchor_href,
                         url = entry.url.split('#').next().unwrap_or(&entry.url),
-                        preview = chunk.preview
+                        preview = preview_escaped
                     ));
                 }
                 md.push('\n');
@@ -238,7 +268,6 @@ Use the links below to access structured content chunks.
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_cyrillic_preview() {

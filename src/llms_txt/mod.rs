@@ -71,6 +71,7 @@ pub struct LlmsEntry {
 pub struct ChunkReference {
     /// Якорь для перехода (#chunk-uuid)
     pub anchor: String,
+    pub anchor_link: Option<String>, // Полная ссылка с якорем (для генерации Markdown)
     /// Краткое превью контента
     pub preview: String,
     /// Позиция в документе (для сортировки)
