@@ -87,6 +87,10 @@ impl PostgresStorage {
         })
     }
 
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
+    }
+
     pub async fn run_migrations(&self) -> Result<()> {
         info!("📜 Running database migrations...");
         info!("✓ Migrations completed");
@@ -728,5 +732,83 @@ impl ContentStorage for PostgresStorage {
     // Переопределяем default impl для эффективной реализации
     async fn save_with_site(&self, content: ExtractedContent, site_key: &str) -> Result<()> {
         self.save_with_site_impl(content, site_key).await  // Вызов собственного метода
+    }
+
+    async fn delete_site_by_key(&self, site_key: &str) -> Result<u64> {
+        let result = sqlx::query(
+            "DELETE FROM sites WHERE site_key = $1"
+        )
+        .bind(site_key)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| StorageError::Database(e.to_string()))?;
+
+        Ok(result.rows_affected())
+    }
+
+    async fn search_semantic_by_site(
+        &self,
+        query: &str,
+        site_key: &str,
+        limit: usize
+    ) -> Result<Vec<ContentChunk>> {
+        let query_embedding = self.embedding_model.embed(query).await?;
+        let query_vector = pgvector::Vector::from(query_embedding);
+
+        let rows = sqlx::query_as::<_, ChunkRow>(
+            r#"
+            SELECT c.id, c.document_id, c.chunk_index, c.title, c.content,
+                   c.content_html, c.word_count, c.start_char, c.end_char, c.meta
+            FROM chunks c
+            JOIN documents d ON c.document_id = d.id
+            WHERE d.site_key = $1
+            ORDER BY c.embedding <-> $2
+            LIMIT $3
+            "#
+        )
+        .bind(site_key)
+        .bind(query_vector)
+        .bind(limit as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StorageError::Database(e.to_string()))?;
+
+        // ... аналогично search_semantic, подгружаем URL документов ...
+        // Получаем URL документов
+        let doc_ids: Vec<Uuid> = rows.iter().map(|r| r.document_id).collect();
+        let doc_urls = if !doc_ids.is_empty() {
+            let docs = sqlx::query("SELECT id, source_url FROM documents WHERE id = ANY($1)")
+                .bind(&doc_ids)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| StorageError::Database(e.to_string()))?;
+            docs.into_iter()
+                .filter_map(|r| {
+                    let id = r.try_get::<Uuid, _>("id").ok()?;
+                    let url = r.try_get::<String, _>("source_url").ok()?;
+                    Some((id, url))
+                })
+                .collect::<std::collections::HashMap<_, _>>()
+        } else {
+            std::collections::HashMap::new()
+        };
+
+        let chunks: Vec<ContentChunk> = rows.into_iter().map(|row| ContentChunk {
+            id: row.id,
+            source_id: row.document_id,
+            source_url: doc_urls.get(&row.document_id).cloned().unwrap_or_default(),
+            chunk_index: row.chunk_index as usize,
+            title: row.title,
+            content: row.content,
+            content_html: row.content_html,
+            word_count: row.word_count as usize,
+            start_char: row.start_char as usize,
+            end_char: row.end_char as usize,
+            meta: row.meta,
+        }).collect();
+
+        info!("✓ Found {} chunks", chunks.len());
+
+        Ok(chunks)
     }
 }

@@ -1,6 +1,10 @@
 // src/main.rs
 use ai_gateway::storage::PostgresStorage;
-use ai_gateway::llms_txt::sitemap::SitemapCrawler;
+use ai_gateway::api::{state::ApiState, routes::create_router};
+use ai_gateway::mcp_server::server::McpServer;  // ← Импортируем MCP-сервер
+use axum::serve;
+use tokio::net::TcpListener;
+
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -13,47 +17,59 @@ async fn main() -> anyhow::Result<()> {
     let database_url = std::env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set");
 
+    let admin_token = std::env::var("ADMIN_TOKEN")
+        .unwrap_or_else(|_| "change-me-in-prod".to_string());
+
+    // Инициализация хранилища
     let storage = PostgresStorage::connect(&database_url).await?;
 
-    // === 1. Краулинг для каждого сайта ===
-    let sites = vec![
-        // Ваш пример:
-        ("marchcat.com", "NFT collections", "https://marchcat.com/sitemap.xml"),
-        // Добавьте другие сайты:
-        // ("habr.com", "Habr", "https://habr.com/sitemap.xml"),
-    ];
+    // Shared state для API и MCP
+    let api_state = ApiState::new(storage, admin_token);
 
-    for (site_key, _site_name, sitemap_url) in sites {
-        if std::env::var("CRAWL_SITEMAP").unwrap_or_default() == "true" {
-            tracing::info!("🕷️  Crawling sitemap for {}...", site_key);
+    // Запуск режимов
+    let mode = std::env::var("MODE").unwrap_or_else(|_| "api".to_string());
 
-            let crawler = SitemapCrawler::new(Default::default());
-            let count = crawler.crawl_sitemap_with_site(
-                sitemap_url,
-                &storage,
-                site_key,  // ← Передаём site_key
-                7000         // max_pages per site
-            ).await?;
+    match mode.as_str() {
+        "api" => {
+            // === REST API сервер ===
+            let app = create_router(api_state);
+            let listener = TcpListener::bind("0.0.0.0:3000").await?;
 
-            tracing::info!("✅ Crawled {} pages for {}", count, site_key);
+            tracing::info!("🚀 Starting REST API on http://0.0.0.0:3000");
+            serve(listener, app).await?;
+        }
+
+        "mcp" => {
+            // === MCP сервер (stdio) ===
+            tracing::info!("🤖 Starting MCP server (stdio)");
+
+            let mcp = McpServer::new(api_state);
+            mcp.run().await?;
+        }
+
+        "both" => {
+            // === Оба режима параллельно ===
+            let api_state_clone = api_state.clone();
+
+            // API в фоне
+            let api_handle = tokio::spawn(async move {
+                let app = create_router(api_state_clone);
+                let listener = TcpListener::bind("0.0.0.0:3000").await?;
+                serve(listener, app).await
+            });
+
+            // MCP в основном потоке
+            let mcp = McpServer::new(api_state);
+            mcp.run().await?;
+
+            // Ждём завершения API (если оно завершится)
+            api_handle.await??;
+        }
+
+        _ => {
+            anyhow::bail!("Unknown mode: {}. Use 'api', 'mcp', or 'both'", mode);
         }
     }
 
-    // === 2. Генерация llms.txt для каждого сайта ===
-    let active_sites = storage.get_active_sites().await?;
-
-    for site in active_sites {
-        tracing::info!("📝 Generating llms.txt for {}...", site.site_key);
-
-        let result = storage.generate_llms_for_site(
-            &site.site_key,
-            &format!("public/{}", site.site_key)  // public/newscryptonft.com/llms.txt
-        ).await?;
-
-        tracing::info!("✓ Generated: {} pages, {} chunks for {}",
-            result.pages_count, result.chunks_count, site.site_key);
-    }
-
-    tracing::info!("🎉 Pipeline completed!");
     Ok(())
 }

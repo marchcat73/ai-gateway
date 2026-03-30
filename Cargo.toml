@@ -4,6 +4,19 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# === Axum API ===
+axum = { version = "0.8.8", features = ["macros"] }
+tower-http = { version = "0.6.8", features = ["cors", "trace", "timeout"] }
+axum-macros = "0.5"
+
+# === MCP Server ===
+mcp-core = "0.1"          # Или используйте jsonrpc-core + custom tools
+tokio-stream = "0.1"
+
+# === Auth ===
+jsonwebtoken = "9"        # Для JWT токенов
+headers = "0.4"           # Для заголовков
+
 # Core async
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"

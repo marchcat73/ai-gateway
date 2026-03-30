@@ -47,4 +47,21 @@ pub trait ContentStorage: Send + Sync {
         // Конкретные реализации могут переопределить это поведение
         self.save(content).await
     }
+
+        /// Удаление сайта по ключу (каскадно удаляет документы и чанки)
+    async fn delete_site_by_key(&self, site_key: &str) -> Result<u64> {
+        // Default impl: возвращаем ошибку, конкретные реализации переопределяют
+        Err(StorageError::Validation("delete_site_by_key not implemented".into()))
+    }
+
+    /// Семантический поиск с фильтром по сайту
+    async fn search_semantic_by_site(
+        &self,
+        query: &str,
+        site_key: &str,
+        limit: usize
+    ) -> Result<Vec<ContentChunk>> {
+        // Default impl: обычный поиск (без фильтра)
+        self.search_semantic(query, limit).await
+    }
 }
