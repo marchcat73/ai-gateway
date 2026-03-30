@@ -516,7 +516,7 @@ pub async fn get_site_by_key(&self, site_key: &str) -> Result<Option<Site>> {
             site_name: site.site_name.clone(),
             site_description: site.site_description.clone(),
             default_language: site.default_language.clone().unwrap_or_else(|| "en".to_string()),
-            include_chunk_content: true,
+            include_chunk_content: std::env::var("INCLUDE_CHUNK_CONTENT").unwrap_or_default() == "true",
             max_links: 7000,
             exclude_patterns: site.exclude_patterns.clone().unwrap_or_default(),
             ..Default::default()

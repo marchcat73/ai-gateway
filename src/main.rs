@@ -18,12 +18,12 @@ async fn main() -> anyhow::Result<()> {
     // === 1. Краулинг для каждого сайта ===
     let sites = vec![
         // Ваш пример:
-        ("newscryptonft.com", "News Crypto NFT", "https://newscryptonft.com/sitemap.xml"),
+        ("marchcat.com", "NFT collections", "https://marchcat.com/sitemap.xml"),
         // Добавьте другие сайты:
         // ("habr.com", "Habr", "https://habr.com/sitemap.xml"),
     ];
 
-    for (site_key, site_name, sitemap_url) in sites {
+    for (site_key, _site_name, sitemap_url) in sites {
         if std::env::var("CRAWL_SITEMAP").unwrap_or_default() == "true" {
             tracing::info!("🕷️  Crawling sitemap for {}...", site_key);
 
