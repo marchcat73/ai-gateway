@@ -1,0 +1,4 @@
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
+{"jsonrpc":"2.0","id":2,"method":"search_semantic","params":{"query":"crypto news","limit":3}}
+{"jsonrpc":"2.0","id":3,"method":"get_llms_txt","params":{"site_key":"cryptonewsnft.com"}}
+{"jsonrpc":"2.0","id":4,"method":"clear_database","params":{"admin_token":"change-me-in-prod","confirm":"YES_DELETE_EVERYTHING"}}
