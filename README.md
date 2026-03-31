@@ -83,9 +83,9 @@ curl -X POST http://localhost:3000/api/sites \
  -H "Authorization: Bearer change-me-in-prod" \
  -H "Content-Type: application/json" \
  -d '{
-   "site_key": "cryptonewsnft.com",
-   "name": "Solana validator monitoring",
-   "url": "https://cryptonewsnft.com"
+   "site_key": "cleanokean.org",
+   "name": "Clean Okean · Rebirth",
+   "url": "https://cleanokean.org"
  }' | jq .
 
 # Ожидаемый ответ:
@@ -109,11 +109,11 @@ curl -X POST http://localhost:3000/api/sites \
 
 ```sh
 # Запускаем краулинг для сайта
-curl -X POST http://localhost:3000/api/sites/cryptonewsnft.com/crawl \
+curl -X POST http://localhost:3000/api/sites/cleanokean.org/crawl \
   -H "Authorization: Bearer change-me-in-prod" \
   -H "Content-Type: application/json" \
   -d '{
-    "sitemap_url": "https://cryptonewsnft.com/sitemap.xml",
+    "sitemap_url": "https://cleanokean.org/sitemap.xml",
     "max_pages": 100
   }' | jq .
 
@@ -128,14 +128,14 @@ curl -X POST http://localhost:3000/api/sites/cryptonewsnft.com/crawl \
 ```sh
 # Регенерация llms.txt для сайта
 
-curl -X POST http://localhost:3000/api/sites/cryptonewsnft.com/regenerate \
+curl -X POST http://localhost:3000/api/sites/cleanokean.org/regenerate \
  -H "Authorization: Bearer change-me-in-prod" \
  -H "Content-Type: application/json" \
  -d '{"include_chunks": true}' | jq .
 
 # Получение сгенерированного llms.txt
 
-curl -s http://localhost:3000/api/sites/cryptonewsnft.com/llms.txt | head -30
+curl -s http://localhost:3000/api/sites/cleanokean.org/llms.txt | head -30
 
 ```
 

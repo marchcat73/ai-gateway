@@ -1,0 +1,79 @@
+# Clean Okean · Rebirth
+
+> AI-Optimized Content Index
+> Generated: 2026-03-31 12:09 UTC
+> Language: en
+
+## 🤖 For AI Agents
+
+- Each page link may contain `#chunk-XXXX` anchors for precise content access
+- Content is pre-chunked for efficient retrieval (RAG-friendly)
+- Use semantic search via the API for contextual queries
+
+## 📚 Content Index
+
+### [Clean Okean · Rebirth](https://cleanokean.org/)
+
+> An NFT collection that turns the problem of pollution into art and
+						real action.
+
+- **Language**: en
+- **Updated**: 2026-03-31
+
+#### Content Chunks
+
+- <a id="chunk-7dc824f7"></a>[`#chunk-7dc824f7`](https://cleanokean.org/#chunk-7dc824f7): \\\# The Ocean is Calling for Help An NFT collection that turns the problem of pollution into art and r...
+
+---
+
+### [Clean Okean · Rebirth](https://cleanokean.org/index.html)
+
+> An NFT collection that turns the problem of pollution into art and
+						real action.
+
+- **Language**: en
+- **Updated**: 2026-03-31
+
+#### Content Chunks
+
+- <a id="chunk-de5f4204"></a>[`#chunk-de5f4204`](https://cleanokean.org/index.html#chunk-de5f4204): \\\# The Ocean is Calling for Help An NFT collection that turns the problem of pollution into art and r...
+
+---
+
+### [Join · Clean Okean](https://cleanokean.org/join.html)
+
+> Your NFT purchase helps fund these incredible non-profits working
+					daily to protect our oceans.
+
+- **Language**: en
+- **Updated**: 2026-03-31
+
+#### Content Chunks
+
+- <a id="chunk-6a56964e"></a>[`#chunk-6a56964e`](https://cleanokean.org/join.html#chunk-6a56964e): Your NFT purchase helps fund these incredible non-profits working daily to protect our oceans. \\\#\\\#\\\# O...
+- <a id="chunk-40890250"></a>[`#chunk-40890250`](https://cleanokean.org/join.html#chunk-40890250): fragile marine ecosystems (coral reefs, mangroves, seagrass), supporting coastal communities, and pr...
+
+---
+
+### [Roadmap · Clean Okean](https://cleanokean.org/roadmap.html)
+
+> How we will clean the ocean from plastic: a phased plan until 2045
+
+- **Language**: en
+- **Updated**: 2026-03-31
+
+#### Content Chunks
+
+- <a id="chunk-eb37efd7"></a>[`#chunk-eb37efd7`](https://cleanokean.org/roadmap.html#chunk-eb37efd7): \\\# 🗺️ Full Roadmap How we will clean the ocean from plastic: a phased plan until 2045 Phase 1 \\\#\\\# Imme...
+
+---
+
+
+## ℹ️ Metadata
+
+- **Total Pages**: 4
+- **Total Chunks**: 5
+- **Index Format**: llms.txt v1.0
+- **Generator**: AI Gateway
+
+> For questions or API access, contact: [support@cleanokean.org](mailto:support@cleanokean.org)
